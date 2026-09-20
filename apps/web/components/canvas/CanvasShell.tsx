@@ -528,7 +528,7 @@ export function CanvasShell({ id }: { id: string }) {
                 <button className="tool" title="Upload PDF" onClick={() => fileInput.current?.click()}>⇪</button>
                 <button className="tool accent" title="Ask AI" onClick={() => { setPanelOpen(true); setTab("Chat"); }}>✦</button>
               </div>
-              {real.length === 0 && <EmptyState onSearch={() => setPalette({ open: true })} onUpload={() => fileInput.current?.click()} onDropbox={() => setDropbox(true)} onDrop={addFiles} />}
+              {real.length === 0 && <EmptyState onSearch={() => setPalette({ open: true })} onUpload={() => fileInput.current?.click()} onDrop={addFiles} />}
               <form className="chatbar" onSubmit={(e) => { e.preventDefault(); setPanelOpen(true); setTab("Chat"); send(); }}>
                 <span style={{ color: "var(--accent)" }}>✦</span>
                 <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask about this canvas…" aria-label="Ask about this canvas" onFocus={() => { setPanelOpen(true); setTab("Chat"); }} />

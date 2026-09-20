@@ -79,6 +79,30 @@ def suppress(req: SuppressRequest, db: Session = Depends(get_db)) -> dict:
     return {"suppressed": req.openalexId}
 
 
+@router.get("/canvas/{canvas_id}/search")
+def search_canvas(canvas_id: str, q: str, db: Session = Depends(get_db)) -> dict:
+    """Search within a canvas. Uses the SearchProvider (Elastic when configured)
+    and falls back to a title/text match over the canvas's own objects."""
+    from providers.registry import get_search
+
+    hits = []
+    try:
+        hits = get_search().search(q, filters={"canvas_id": canvas_id})
+    except Exception:
+        hits = []
+    if hits:
+        return {"results": hits, "source": "search-provider"}
+
+    term = q.lower()
+    results = [
+        {"id": str(o.id), "title": o.title, "objectType": o.object_type}
+        for o in service.list_objects(db, uuid.UUID(canvas_id), limit=200)
+        if term in (o.title or "").lower()
+        or term in str((o.content or {}).get("abstract") or (o.content or {}).get("text") or "").lower()
+    ]
+    return {"results": results[:20], "source": "database"}
+
+
 @router.post("/objects", response_model=AddObjectResponse)
 def add_object(req: AddObjectRequest, db: Session = Depends(get_db)) -> AddObjectResponse:
     source_entity_id = None

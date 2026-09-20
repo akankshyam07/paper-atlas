@@ -2,7 +2,9 @@
 // Empty canvas / onboarding (wireframe 2n).
 import { useState } from "react";
 
-export function EmptyState({ onSearch, onUpload, onDropbox, onDrop }: { onSearch: () => void; onUpload: () => void; onDropbox: () => void; onDrop: (files: FileList) => void }) {
+// Dropbox import stays available from the toolbar; keeping it out of the empty
+// state keeps the first screen to the two actions that start a rabbit hole.
+export function EmptyState({ onSearch, onUpload, onDrop }: { onSearch: () => void; onUpload: () => void; onDrop: (files: FileList) => void }) {
   const [over, setOver] = useState(false);
   return (
     <div className="empty-canvas">
@@ -12,7 +14,6 @@ export function EmptyState({ onSearch, onUpload, onDropbox, onDrop }: { onSearch
         <div className="actions">
           <button className="btn lg primary" onClick={onSearch}>Search OpenAlex</button>
           <button className="btn lg" onClick={onUpload}>Upload PDF</button>
-          <button className="btn lg" onClick={onDropbox}>Import from Dropbox</button>
         </div>
         <div
           className={`drop${over ? " over" : ""}`}

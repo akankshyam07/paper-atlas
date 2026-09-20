@@ -60,7 +60,28 @@ def create_object(
     db.add(obj)
     db.commit()
     db.refresh(obj)
+    _index(obj)
     return obj
+
+
+def _index(obj: CanvasObject) -> None:
+    """Mirror the object into the SearchProvider so canvas search can find it.
+    Best-effort: search being down must never fail a canvas mutation."""
+    from providers.registry import get_search
+
+    content = obj.content or {}
+    try:
+        get_search().index(str(obj.id), {
+            "canvas_id": str(obj.canvas_id),
+            "object_id": str(obj.id),
+            "object_type": obj.object_type,
+            "title": obj.title or "",
+            "text": str(content.get("abstract") or content.get("text") or ""),
+            "openalex_id": content.get("openalexId"),
+            "year": content.get("year"),
+        })
+    except Exception:
+        pass
 
 
 def create_edge(
