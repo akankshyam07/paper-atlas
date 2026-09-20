@@ -1555,3 +1555,54 @@ Keep root context.md short and operational.
 Use the PRD as a referenced product specification rather than stuffing all requirements into context.md.
 Prefer explore → plan → implement → verify.
 Use tests and browser-level validation for UI flows.
+
+---
+
+## 37. Sponsor Stack (HackMIT)
+
+The product stays sponsor-agnostic at its core. HackMIT sponsor technologies are
+incorporated only where they add real product value, and always **behind modular
+provider interfaces** so they never distort the research workflow or couple the
+product to a single vendor. No core workflow — and no UI component — may import a
+sponsor SDK directly. A sponsor SDK appears in exactly one place: its provider
+implementation under `apps/api/providers/`.
+
+Full details and the interface↔sponsor mapping live in
+[SPONSORS.md](./SPONSORS.md). Summary:
+
+### Provider interfaces
+- `LLMProvider` — chat/completion, tool calling, classification/reranking
+- `EmbeddingProvider` — embeddings for user/canvas-local content only
+- `SearchProvider` — hybrid keyword+semantic retrieval over app content
+- `ResearchDataProvider` — scholarly discovery and citation traversal
+- `InferenceOptimizationProvider` — cost/latency/context optimization (gateway)
+
+### Mapping
+- **OpenAI** → `LLMProvider` (+ optional `EmbeddingProvider`). Primary
+  intelligence: agent, explain/summarize, structured tool calling, Broader vs.
+  Deeper classification, supporting/contradicting analysis, artifact generation.
+  Operates through scoped canvas tools, never direct DB access.
+- **Elastic** → `SearchProvider`. Hybrid search across canvas objects, excerpts,
+  notes, artifacts, parsed PDFs; metadata filtering; canvas RAG. Indexes only
+  application/user content and cached metadata. OpenAlex stays the scholarly
+  source of truth; Elastic does not mirror it.
+- **Voloridge** → `ResearchDataProvider` (OpenAlex is the default). Structured
+  extraction across literature, relationship/pattern detection, high-signal
+  ranking from large candidate sets. Integrate only where it strengthens
+  discovery, gated on a real challenge/API.
+- **Token Company** → `InferenceOptimizationProvider`, behind the AI/model
+  gateway. Reduce inference cost/latency, compress long-document context.
+- **Devin** → development-time agent only (parallel component implementation,
+  API/test generation, scoped fixes, deploy/repo maintenance). The shipped
+  product must run without Devin — it is not a runtime dependency.
+- **Long Lake** → challenge alignment, expressed as product behavior (no
+  interface): AI that understands the research graph, turns explanations into
+  persistent objects, proposes the next research direction visually, connects
+  claims to papers/excerpts, and reorganizes the workspace via user-approved
+  actions. Demo narrative: fragmented research across tabs/PDFs/Wikipedia/
+  chatbots becomes one persistent, inspectable environment.
+
+### Constraint
+Sponsor services must be replaceable after the hackathon. This is an
+architectural constraint, added to §33: do not let a sponsor SDK leak outside
+its provider implementation.

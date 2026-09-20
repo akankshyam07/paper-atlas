@@ -6,6 +6,7 @@ Broader/Deeper scoring (recommend.py) and AI explain (explain.py).
 import uuid
 from fastapi import APIRouter
 
+from providers.registry import get_llm
 from schemas import (
     SearchResponse, PaperPreview,
     RecommendRequest, RecommendResponse, Recommendation,
@@ -60,7 +61,7 @@ def explain(req: ExplainRequest) -> ExplainResponse:
         objectType="AI_SUMMARY",
         sourceEntityId=None,
         title="Explanation (stub)",
-        content={"text": "This is a stub explanation."},
+        content={"text": get_llm().complete(req.text or "selection")},
         x=0.0,
         y=0.0,
         createdBy="AI",
