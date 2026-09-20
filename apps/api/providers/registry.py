@@ -7,8 +7,11 @@ imports a vendor SDK.
 """
 from __future__ import annotations
 
+import logging
 import os
 from functools import lru_cache
+
+log = logging.getLogger(__name__)
 
 from providers.base import (
     LLMProvider, EmbeddingProvider, SearchProvider,
@@ -28,7 +31,7 @@ def get_llm() -> LLMProvider:
             from providers.openai_llm import OpenAILLM
             return OpenAILLM()
         except Exception:  # SDK missing or bad key — keep the app usable
-            pass
+            log.warning("OPENAI_API_KEY is set but OpenAILLM failed; using stub", exc_info=True)
     return StubLLM()
 
 
@@ -39,7 +42,7 @@ def get_embedding() -> EmbeddingProvider:
             from providers.openai_llm import OpenAIEmbedding
             return OpenAIEmbedding()
         except Exception:
-            pass
+            log.warning("OPENAI_API_KEY is set but OpenAIEmbedding failed; using stub", exc_info=True)
     return StubEmbedding()
 
 
@@ -50,7 +53,7 @@ def get_search() -> SearchProvider:
             from providers.elastic_search import ElasticSearchProvider
             return ElasticSearchProvider()
         except Exception:
-            pass
+            log.warning("ELASTIC_URL is set but ElasticSearchProvider failed; using stub", exc_info=True)
     return StubSearch()
 
 
@@ -80,5 +83,18 @@ def get_speech() -> SpeechProvider:
             from providers.deepgram_speech import DeepgramSpeech
             return DeepgramSpeech()
         except Exception:
-            pass
+            log.warning("DEEPGRAM_API_KEY is set but DeepgramSpeech failed; using stub", exc_info=True)
     return StubSpeech()
+
+
+def live_providers() -> dict[str, str]:
+    """Which implementation each provider resolved to. Logged at startup: a
+    stub where a real one was expected is otherwise invisible until a user
+    reads "[stub explanation of: ...]" in the chat."""
+    return {
+        "llm": type(get_llm()).__name__,
+        "embedding": type(get_embedding()).__name__,
+        "search": type(get_search()).__name__,
+        "speech": type(get_speech()).__name__,
+        "inference": type(get_inference_optimizer()).__name__,
+    }

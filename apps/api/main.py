@@ -4,6 +4,9 @@ Stub responses ship on `main` so the frontend can develop immediately and the
 demo build always runs. Each lane replaces its own stubs with real logic on its
 branch (backend-data: canvas/, backend-ai: intel/).
 """
+import config  # noqa: F401  — loads .env before anything below reads os.environ
+
+import logging
 import os
 
 from fastapi import FastAPI
@@ -43,6 +46,23 @@ app.include_router(concepts_router)
 app.include_router(agent_router)
 app.include_router(intel_router)
 app.include_router(speech_router)
+
+
+def report_providers() -> None:
+    """Say which implementations are live. A stub standing in for a configured
+    provider used to surface only as "[stub explanation of: ...]" in the UI."""
+    from providers.registry import live_providers
+
+    resolved = live_providers()
+    logging.getLogger("atlas").info(
+        "providers: %s", ", ".join(f"{k}={v}" for k, v in resolved.items())
+    )
+    for name, impl in resolved.items():
+        if impl.startswith("Stub"):
+            logging.getLogger("atlas").warning("%s is a stub — responses will not be real", name)
+
+
+report_providers()
 
 
 @app.get("/health")

@@ -3,6 +3,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import create_engine
 
+import config  # noqa: F401  — loads .env before db.session reads DATABASE_URL
 from db.session import DATABASE_URL
 from models.entities import Base
 
