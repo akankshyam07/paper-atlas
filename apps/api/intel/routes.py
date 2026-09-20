@@ -38,9 +38,11 @@ def recommend(req: RecommendRequest) -> RecommendResponse:
     # / foundational / references. Deeper = semantic-narrow / recent citing works.
     # Score candidates deterministically, LLM-rerank top few, suppress loops.
     label = "foundational method" if req.mode == "broader" else "narrower application"
+    # Distinct ids so the frontend's on-canvas/rejected suppression doesn't
+    # swallow every stub candidate.
     recs = [
         Recommendation(
-            paper=_FAKE_PAPER,
+            paper=_FAKE_PAPER.model_copy(update={"openalexId": f"W{req.mode}{req.offset + i}", "title": f"{_FAKE_PAPER.title} ({req.mode} {req.offset + i + 1})"}),
             mode=req.mode,
             relationshipLabel=label,
             reason=f"stub {req.mode} candidate #{i + 1}",
