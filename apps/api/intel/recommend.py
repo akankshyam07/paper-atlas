@@ -54,6 +54,10 @@ def _title_of(w: dict[str, Any]) -> str:
     return (w.get("title") or w.get("display_name") or "").lower()
 
 
+def norm_title(title: str | None) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (title or "").lower()).strip()
+
+
 def _looks_like_survey(w: dict[str, Any]) -> bool:
     t = _title_of(w)
     if any(h in t for h in _SURVEY_HINTS):
@@ -193,6 +197,7 @@ def recommend(
     mode: str,
     offset: int = 0,
     exclude_ids: set[str] | None = None,
+    exclude_titles: set[str] | None = None,
     client: OpenAlexProvider | None = None,
     count: int = RECOMMENDATION_COUNT,
 ) -> list[dict[str, Any]]:
@@ -204,6 +209,10 @@ def recommend(
         return []
     source_id = mapping.short_id(source.get("id"))
     exclude.add(source_id)
+    # Title exclusion covers OpenAlex's duplicate records, where one paper
+    # exists under several ids and would otherwise be suggested repeatedly.
+    seen_titles = set(exclude_titles or set())
+    seen_titles.add(norm_title(source.get("title") or source.get("display_name")))
 
     # Dedupe the pool and drop anything already on the canvas or rejected
     # (loop suppression, PRD §13.5).
@@ -214,8 +223,13 @@ def recommend(
         if not cid or cid in seen or cid in exclude:
             continue
         seen.add(cid)
-        if not (cand.get("title") or cand.get("display_name")):
+        title = cand.get("title") or cand.get("display_name")
+        if not title:
             continue
+        nt = norm_title(title)
+        if not nt or nt in seen_titles:
+            continue
+        seen_titles.add(nt)
         # Relevance floor: topic-pool candidates must share real substance, not
         # just a broad topic label. Citation-linked work is exempt — the link
         # itself is the evidence.

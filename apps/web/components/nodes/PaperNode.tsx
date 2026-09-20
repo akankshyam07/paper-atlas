@@ -1,7 +1,7 @@
 "use client";
 // A paper on the board IS the document: the rendered page, readable at 100%
 // zoom, not a metadata card. Books open as a two-page spread that flips.
-import { memo, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 import type { NodeData } from "../../lib/store";
 import { useBoardActions } from "../canvas/actions";
@@ -44,6 +44,22 @@ export const PaperNode = memo(function PaperNode({ id, data }: NodeProps<NodeDat
   const [reading, setReading] = useState(false);
   const step = isBook ? 2 : 1;
 
+  // Mount the viewer only while the node is actually on screen. A board of
+  // papers otherwise starts a PDF viewer per node at once, which is what left
+  // them rendering blank, and is what the PRD warns against (§21).
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [onScreen, setOnScreen] = useState(false);
+  useEffect(() => {
+    const el = hostRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => setOnScreen(e.isIntersecting),
+      { rootMargin: "300px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   const turn = (dir: 1 | -1) => {
     setFlip(dir === 1 ? "fwd" : "back");
     setPage((n) => Math.max(1, n + dir * step));
@@ -69,8 +85,8 @@ export const PaperNode = memo(function PaperNode({ id, data }: NodeProps<NodeDat
           <span className="pad-count">{c.tucked.length}</span>
         </button>
       )}
-      <div className={`sheet-stage${isBook ? " spread" : ""} flip-${flip}`}>
-        {src ? (
+      <div ref={hostRef} className={`sheet-stage${isBook ? " spread" : ""} flip-${flip}`}>
+        {src && onScreen ? (
           isBook ? (
             <>
               <div className="leaf left"><iframe key={`l${page}`} src={pageSrc(src, page, "Fit")} title={`${data.object.title} page ${page}`} /></div>

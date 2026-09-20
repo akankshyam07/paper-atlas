@@ -210,6 +210,28 @@ def canvas_openalex_ids(db: Session, canvas_id: uuid.UUID) -> set[str]:
     return ids
 
 
+def canvas_titles(db: Session, canvas_id: uuid.UUID) -> set[str]:
+    """Normalised titles already on the canvas.
+
+    OpenAlex holds genuine duplicate records — the same paper under several work
+    ids — so excluding by id alone lets the same paper be suggested again and
+    again. Matching on title catches those.
+    """
+    import re as _re
+
+    rows = db.execute(
+        select(CanvasObject.title).where(
+            CanvasObject.canvas_id == canvas_id,
+            CanvasObject.deleted_at.is_(None),
+        )
+    ).scalars().all()
+    out: set[str] = set()
+    for t in rows:
+        if t:
+            out.add(_re.sub(r"[^a-z0-9]+", " ", t.lower()).strip())
+    return out
+
+
 def cache_openalex_work(db: Session, *, source_entity_id: uuid.UUID, work: dict) -> None:
     """Persist a touched OpenAlex work (PRD §12: cache only what the user opens,
     never mirror the corpus). Upsert so reopening a paper refreshes counts."""

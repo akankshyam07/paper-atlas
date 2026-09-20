@@ -313,10 +313,33 @@ export function CanvasShell({ id }: { id: string }) {
     }
   }, [doc, byId, say, fail, placeGhosts]);
 
+  // Accepting is a network round trip, so a second click before it lands would
+  // add the paper twice; and a candidate that is already on the board should
+  // never be added again.
+  const accepting = useRef<Set<string>>(new Set());
+
   const acceptSuggestion = useCallback(async (nid: string) => {
     const g = byId(nid);
     const s = g?.data.suggestion;
     if (!doc || !g || !s) return;
+    if (accepting.current.has(nid)) return;
+
+    const norm = (t?: string | null) => (t ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const already = doc.nodes.some((n) =>
+      n.type !== "suggestion" &&
+      (n.data.paper?.openalexId === s.paper.openalexId ||
+       (n.data.object.content.openalexId as string | undefined) === s.paper.openalexId ||
+       (!!norm(n.data.object.title) && norm(n.data.object.title) === norm(s.paper.title))));
+    if (already) {
+      update((d) => ({
+        ...d,
+        nodes: d.nodes.filter((n) => n.id !== nid),
+        edges: d.edges.filter((e) => e.source !== nid && e.target !== nid),
+      }));
+      return say("Already on this canvas.");
+    }
+
+    accepting.current.add(nid);
     try {
       const { object } = await api.addObject({ canvasId: doc.id, objectType: "PAPER", openalexId: s.paper.openalexId, title: s.paper.title, content: { openalexId: s.paper.openalexId, recommendedBy: s.anchorId, mode: s.mode, reason: s.reason }, x: g.position.x, y: g.position.y });
       const [src, tgt] = s.mode === "broader" ? [object.id, s.anchorId] : [s.anchorId, object.id];
@@ -328,8 +351,10 @@ export function CanvasShell({ id }: { id: string }) {
       }));
     } catch (e) {
       fail("Accept")(e);
+    } finally {
+      accepting.current.delete(nid);
     }
-  }, [doc, byId, update, fail]);
+  }, [doc, byId, update, fail, say]);
 
   const rejectSuggestion = useCallback((nid: string) => {
     const s = byId(nid)?.data.suggestion;

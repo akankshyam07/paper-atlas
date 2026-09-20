@@ -97,6 +97,7 @@ def recommend(req: RecommendRequest, db: Session = Depends(get_db)) -> Recommend
         mode=req.mode,
         offset=req.offset,
         exclude_ids=exclude,
+        exclude_titles=service.canvas_titles(db, canvas_id) if canvas_id else set(),
     )
     return RecommendResponse(recommendations=[
         Recommendation(
