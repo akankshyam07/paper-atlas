@@ -303,14 +303,20 @@ a:hover { color: var(--accent-hover); }
 
 /* Page navigation — appears on hover, like a document viewer's floating bar. */
 .node.pdf { position: relative; }
-.pager { position: absolute; left: 50%; bottom: -17px; transform: translateX(-50%) translateY(4px);
+/* Paging is the main way to read a paper on the board, so it is always present
+   rather than hidden behind a hover — a control you have to discover by
+   hovering may as well not be there. */
+.pager { position: absolute; left: 50%; bottom: 52px; transform: translateX(-50%);
   display: flex; align-items: center; gap: 2px; padding: 4px 6px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
-  box-shadow: var(--shadow-2); opacity: 0; pointer-events: none;
-  transition: opacity 0.14s ease, transform 0.14s ease; z-index: 3; }
-.node.pdf:hover .pager, .pager:hover, .react-flow__node.selected .pager { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
-.pager button { border: 0; background: transparent; cursor: pointer; font-size: 14px; line-height: 1;
-  color: var(--ink-3); padding: 2px 7px; border-radius: 999px; }
+  box-shadow: var(--shadow-2); opacity: 0.92; pointer-events: auto;
+  transition: opacity 0.14s ease, box-shadow 0.14s ease; z-index: 6; }
+/* Page navigation is the primary way to read a paper on the board, so it shows
+   on hover over any document node — not only when one is selected. */
+.node.pdf:hover .pager, .node.sheet:hover .pager, .node.doc:hover .pager,
+.pager:hover, .react-flow__node.selected .pager { opacity: 1; box-shadow: var(--shadow-3); }
+.pager button { border: 0; background: transparent; cursor: pointer; font-size: 16px; line-height: 1;
+  color: var(--ink-2); padding: 3px 9px; border-radius: 999px; font-weight: 500; }
 .pager button:hover:not(:disabled) { background: var(--bg-2); color: var(--ink); }
 .pager button:disabled { opacity: 0.3; cursor: default; }
 .pager-count { font-size: 11px; color: var(--ink-3); min-width: 48px; text-align: center;

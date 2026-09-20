@@ -52,10 +52,20 @@ export const PaperNode = memo(function PaperNode({ id, data }: NodeProps<NodeDat
   useEffect(() => {
     const el = hostRef.current;
     if (!el) return;
-    const io = new IntersectionObserver(
-      ([e]) => setOnScreen(e.isIntersecting),
-      { rootMargin: "300px" },
-    );
+
+    // Check position directly first. Relying on the observer's first callback
+    // alone left a node that was already visible at mount showing its fallback,
+    // because that callback is not guaranteed to arrive promptly inside React
+    // Flow's transformed container.
+    const visible = () => {
+      const r = el.getBoundingClientRect();
+      return r.bottom > -300 && r.top < window.innerHeight + 300;
+    };
+    setOnScreen(visible());
+
+    const io = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting || visible()), {
+      rootMargin: "300px",
+    });
     io.observe(el);
     return () => io.disconnect();
   }, []);
