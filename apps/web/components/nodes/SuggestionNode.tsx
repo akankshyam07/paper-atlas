@@ -1,27 +1,34 @@
 "use client";
-// Translucent Broader/Deeper preview node with accept/reject. FE wires ✓/× to
-// api.addObject + api.addEdge (accept) or a reject/suppress call.
+// Translucent Broader/Deeper ghost (wireframe 2h): dashed border, reason,
+// ✓ accepts (persists node + edge), × rejects (suppressed for this canvas).
+import { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
+import type { NodeData } from "../../lib/store";
+import { useBoardActions } from "../canvas/actions";
 
-export type SuggestionNodeData = {
-  title: string;
-  relationshipLabel: string;
-  reason: string;
-  onAccept?: () => void;
-  onReject?: () => void;
-};
-
-export function SuggestionNode({ data }: NodeProps<SuggestionNodeData>) {
+export const SuggestionNode = memo(function SuggestionNode({ id, data }: NodeProps<NodeData>) {
+  const a = useBoardActions();
+  const s = data.suggestion!;
+  const p = s.paper;
+  const idx = (data.object.content.index as number) ?? 0;
   return (
-    <div style={{ border: "1px dashed #999", borderRadius: 8, padding: 8, background: "rgba(255,255,255,0.6)", width: 220 }}>
-      <div style={{ fontSize: 10, textTransform: "uppercase", color: "#888" }}>{data.relationshipLabel}</div>
-      <strong style={{ fontSize: 13 }}>{data.title}</strong>
-      <div style={{ fontSize: 11, color: "#666" }}>{data.reason}</div>
-      <div style={{ marginTop: 6, display: "flex", gap: 8 }}>
-        <button onClick={data.onAccept}>✓</button>
-        <button onClick={data.onReject}>×</button>
+    <div className="node suggestion" title={`${p.authors.join(", ")}${p.venue ? ` · ${p.venue}` : ""} · ${p.citedByCount.toLocaleString()} citations`}>
+      <div className="eyebrow accent">
+        {s.mode} · {idx + 1} of 3
       </div>
-      <Handle type="target" position={Position.Left} />
+      <div className="node-title">{p.title}</div>
+      <div className="node-sub">
+        {p.year ?? "—"} · {s.relationshipLabel}
+      </div>
+      <div className="node-reason">{s.reason}</div>
+      <div className="verdict nodrag">
+        <button className="yes" title="Accept" onClick={() => a.accept(id)}>✓</button>
+        <button className="no" title="Reject" onClick={() => a.reject(id)}>×</button>
+        {idx === 2 && (
+          <button className="more" onClick={() => a.more(s.anchorId, s.mode)}>Show 3 more</button>
+        )}
+      </div>
+      {s.mode === "broader" ? <Handle type="source" position={Position.Right} /> : <Handle type="target" position={Position.Left} />}
     </div>
   );
-}
+});

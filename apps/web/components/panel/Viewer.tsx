@@ -1,0 +1,115 @@
+"use client";
+// Expanded object viewer in the docked panel (wireframe 2f) with the text
+// selection menu (2g). Selecting text anywhere in the body shows
+// Capture / AI / Research actions; the selection's source object + offsets
+// travel with the action so excerpts keep provenance.
+import { useCallback, useEffect, useState } from "react";
+import type { Node } from "reactflow";
+import type { NodeData } from "../../lib/store";
+
+export type Selection = { text: string; objectId: string; start: number; end: number };
+export type SelectionAction = "highlight" | "note" | "explain" | "summarize" | "ask" | "related";
+
+const TABS = ["Abstract", "References", "Cited by", "Topics"] as const;
+
+export function Viewer({ node, edges, pdfUrl, onSelectionAction, onAction }: {
+  node: Node<NodeData>;
+  edges: { label: string; title: string; id: string }[];
+  pdfUrl?: string;
+  onSelectionAction: (a: SelectionAction, s: Selection) => void;
+  onAction: (a: "broader" | "deeper" | "explain" | "chat") => void;
+}) {
+  const [tab, setTab] = useState<(typeof TABS)[number]>("Abstract");
+  const [menu, setMenu] = useState<{ x: number; y: number; sel: Selection } | null>(null);
+  const o = node.data.object;
+  const p = node.data.paper;
+  const body = String(o.content.abstract ?? o.content.text ?? "");
+
+  const onMouseUp = useCallback(() => {
+    const s = window.getSelection();
+    const text = s?.toString().trim() ?? "";
+    if (!s || !text || s.rangeCount === 0) return setMenu(null);
+    const r = s.getRangeAt(0).getBoundingClientRect();
+    const start = body.indexOf(text);
+    setMenu({ x: Math.min(r.left, window.innerWidth - 200), y: r.bottom + 6, sel: { text, objectId: o.id, start, end: start + text.length } });
+  }, [body, o.id]);
+
+  useEffect(() => {
+    const off = () => setMenu(null); // any new mousedown starts a new selection (the menu itself swallows its mousedown)
+    document.addEventListener("mousedown", off);
+    return () => document.removeEventListener("mousedown", off);
+  }, []);
+
+  const act = (a: SelectionAction) => { if (menu) onSelectionAction(a, menu.sel); setMenu(null); window.getSelection()?.removeAllRanges(); };
+
+  return (
+    <div className="stack" style={{ height: "100%" }}>
+      <div className="viewer-head">
+        <div className="eyebrow">{p ? "OpenAlex work" : node.type}</div>
+        <div className="viewer-title">{o.title}</div>
+        {p && (
+          <div className="viewer-meta">{p.authors.join(", ")}{p.venue ? ` · ${p.venue}` : ""}{p.year ? ` · ${p.year}` : ""}</div>
+        )}
+        <div className="node-chips" style={{ marginBottom: 10 }}>
+          {p?.year && <span className="chip">{p.year}</span>}
+          {p && <span className="chip">{p.citedByCount.toLocaleString()} citations</span>}
+          {p?.hasPdf && <span className="chip accent">OA · PDF</span>}
+          {o.createdBy === "AI" && <span className="chip accent">AI-generated</span>}
+        </div>
+      </div>
+      {p && (
+        <div className="tabs" role="tablist">
+          {TABS.map((t) => (
+            <button key={t} role="tab" className="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>
+          ))}
+        </div>
+      )}
+      <div className="panel-body" onMouseUp={onMouseUp}>
+        {node.type === "pdf" ? (
+          pdfUrl ? <iframe className="reader-frame" src={pdfUrl} title={o.title ?? "PDF"} /> : (
+            <div className="reader-placeholder">This PDF’s bytes aren’t stored yet.<br />Re-upload it to read in this session.</div>
+          )
+        ) : tab !== "Abstract" && p ? (
+          <div className="empty">{tab} aren’t exposed by the API yet.</div>
+        ) : body ? (
+          <div className="viewer-body">{body.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}</div>
+        ) : (
+          <div className="empty">{p ? "Abstract not available — metadata only." : "Nothing to read here."}</div>
+        )}
+        {edges.length > 0 && (
+          <dl className="kv">
+            <dt>Links</dt>
+            <dd>{edges.map((e) => <div key={e.id}><span className="muted">{e.label}</span> {e.title}</div>)}</dd>
+          </dl>
+        )}
+      </div>
+      <div className="viewer-actions">
+        {p && <button className="btn" onClick={() => onAction("broader")}>Broader</button>}
+        {p && <button className="btn" onClick={() => onAction("deeper")}>Deeper</button>}
+        <button className="btn" onClick={() => onAction("explain")}>Explain</button>
+        <button className="btn primary" onClick={() => onAction("chat")}>Chat about this</button>
+      </div>
+      {menu && (
+        <div className="selmenu popover" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.preventDefault()}>
+          <div className="eyebrow">Capture</div>
+          <div className="group">
+            <button className="chip click" onClick={() => act("highlight")}>Highlight</button>
+            <button className="chip click" onClick={() => act("note")}>Add note</button>
+          </div>
+          <div className="eyebrow">AI</div>
+          <div className="group">
+            <button className="chip click" onClick={() => act("explain")}>Explain</button>
+            <button className="chip click" onClick={() => act("summarize")}>Summarize</button>
+            <button className="chip click" onClick={() => act("ask")}>Ask</button>
+          </div>
+          <div className="eyebrow">Research</div>
+          <div className="group">
+            <button className="chip click solid" onClick={() => act("related")}>Related</button>
+            <button className="chip click" disabled title="Needs a supporting/contradicting endpoint">Supporting</button>
+            <button className="chip click" disabled title="Needs a supporting/contradicting endpoint">Contradicting</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

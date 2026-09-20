@@ -1,5 +1,5 @@
-import { Canvas } from "../components/canvas/Canvas";
+import { Home } from "../components/Home";
 
-export default function Home() {
-  return <Canvas />;
+export default function Page() {
+  return <Home />;
 }
