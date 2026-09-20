@@ -1,17 +1,18 @@
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine
 
 from db.session import DATABASE_URL
 from models.entities import Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
 if config.config_file_name:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+# Use DATABASE_URL directly — do NOT route through ConfigParser, which would
+# treat '%' (from a percent-encoded password) as interpolation syntax.
 
 
 def run_migrations_offline() -> None:
@@ -21,9 +22,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    cfg = config.get_section(config.config_ini_section) or {}
-    cfg["sqlalchemy.url"] = DATABASE_URL
-    connectable = engine_from_config(cfg, prefix="sqlalchemy.", poolclass=pool.NullPool)
+    connectable = create_engine(DATABASE_URL, future=True)
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
