@@ -55,3 +55,48 @@ def serve(key: str) -> Response:
     if data is None:
         raise HTTPException(status_code=404, detail="file not found")
     return Response(content=data, media_type="application/pdf")
+
+
+@router.get("/proxy/pdf")
+def proxy_pdf(url: str) -> Response:
+    """Stream an open-access PDF through the app.
+
+    Publishers commonly send X-Frame-Options / CSP that stop a cross-origin PDF
+    being embedded, so previewing one directly in the canvas renders blank.
+    Serving it from our own origin fixes that.
+    """
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    import httpx
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise HTTPException(status_code=400, detail="only http(s) urls")
+
+    # SSRF guard: never let a caller point this at the private network.
+    try:
+        for info in socket.getaddrinfo(parsed.hostname, None):
+            ip = ipaddress.ip_address(info[4][0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                raise HTTPException(status_code=400, detail="blocked host")
+    except socket.gaierror:
+        raise HTTPException(status_code=400, detail="unresolvable host")
+
+    try:
+        with httpx.Client(timeout=20.0, follow_redirects=True) as client:
+            r = client.get(url, headers={"User-Agent": "PaperAtlas/1.0"})
+            r.raise_for_status()
+            data = r.content
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"fetch failed: {e}")
+
+    if len(data) > storage.MAX_BYTES:
+        raise HTTPException(status_code=413, detail="pdf too large to preview")
+
+    return Response(
+        content=data,
+        media_type=r.headers.get("content-type", "application/pdf").split(";")[0],
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
