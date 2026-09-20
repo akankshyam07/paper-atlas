@@ -22,14 +22,17 @@ blocks the demo. Status as of the current `main`.
 
 ## P0 — Broken right now
 
-1. **CI fails on every push.** `.github/workflows/ci.yml` runs `pytest` with no
-   Postgres service, so the 10 DB-backed tests error on connection. Add a
-   `services: postgres` block (with pgvector image) and a `DATABASE_URL` env, or
-   mark DB tests to skip when no database is reachable.
-2. **`test_providers.py` is now redundant** — fully superseded by
-   `test_sponsor_providers.py`. Delete it.
-3. **CORS is wide open** (`allow_origins=["*"]` in `main.py`). Lock to the web
-   origin before any deploy.
+All fixed. CI is green.
+
+1. ~~CI fails on every push.~~ The cause was **not** the missing Postgres service
+   as first assumed — CI never reached pytest. `pip install` failed on a
+   dependency conflict (`supabase 2.10` pinned `httpx<0.28` against our
+   `httpx==0.28.1`), then on `realtime` requiring `pydantic>=2.11.7`. Bumped
+   supabase and pydantic; added the Postgres service and `alembic upgrade head`
+   that the DB-backed tests would have needed next.
+2. ~~`test_providers.py` redundant.~~ Deleted.
+3. ~~CORS wide open.~~ Restricted to the web origins via `CORS_ORIGINS`, with
+   explicit methods/headers and credentials enabled.
 
 ## P1 — Needed for the demo to feel real
 

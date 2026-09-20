@@ -4,6 +4,8 @@ Stub responses ship on `main` so the frontend can develop immediately and the
 demo build always runs. Each lane replaces its own stubs with real logic on its
 branch (backend-data: canvas/, backend-ai: intel/).
 """
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -14,12 +16,21 @@ from speech.routes import router as speech_router
 
 app = FastAPI(title="Paper Atlas API")
 
-# ponytail: wide-open CORS for local dev; lock to the web origin before any deploy.
+# Allow only the web app's origins. CORS_ORIGINS overrides for deploys; the
+# defaults cover local development. Never widen this to "*" — with credentials
+# enabled a wildcard would let any site call the API as the signed-in user.
+CORS_ORIGINS = [
+    o.strip() for o in os.getenv(
+        "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    ).split(",") if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(canvas_router)

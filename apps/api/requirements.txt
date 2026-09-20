@@ -4,12 +4,12 @@ sqlalchemy==2.0.36
 psycopg[binary]==3.2.3
 pgvector==0.3.6
 httpx==0.28.1
-pydantic==2.10.3
+pydantic==2.11.7
 python-dotenv==1.0.1
 pytest==8.3.4
 python-multipart==0.0.20
 alembic==1.14.0
-supabase==2.10.0  # Storage/Auth; optional until wired
+supabase==2.31.0  # Storage/Auth; allows httpx 0.28 (2.10 pinned httpx<0.28)
 openai==1.59.6  # optional: real LLM when OPENAI_API_KEY is set
 elasticsearch==8.17.0  # Elastic hybrid search (optional)
 dropbox==12.0.2  # Dropbox file import (optional)

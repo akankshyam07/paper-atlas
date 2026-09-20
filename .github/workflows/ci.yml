@@ -10,12 +10,32 @@ jobs:
     defaults:
       run:
         working-directory: apps/api
+    services:
+      # The data-layer tests exercise real Postgres behaviour (foreign keys,
+      # transactions, JSONB), so CI runs against a real database rather than
+      # mocking it. pgvector matches what Supabase provides.
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: atlas
+          POSTGRES_PASSWORD: atlas
+          POSTGRES_DB: atlas
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U atlas"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://atlas:atlas@localhost:5432/atlas
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
+      - run: alembic upgrade head
       - run: pytest -q
 
   web:
@@ -28,6 +48,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: npm install
+      - run: npm ci
       - run: npm run typecheck
       - run: npm run build
