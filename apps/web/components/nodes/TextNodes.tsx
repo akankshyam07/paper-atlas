@@ -1,12 +1,11 @@
 "use client";
 // Note (editable), Excerpt (quoted, keeps page + source), Thread (chat as a
 // node), PDF (upload card) and Group (frame) nodes.
-import { memo, useCallback, useState } from "react";
+import { memo, useState } from "react";
 import { Handle, NodeResizer, Position, type NodeProps } from "reactflow";
 import type { NodeData } from "../../lib/store";
 import { useBoardActions } from "../canvas/actions";
 import { QuickActions } from "./PaperNode";
-import { PdfPage } from "./PdfPage";
 
 const Handles = () => (
   <>
@@ -73,12 +72,8 @@ export const PdfNode = memo(function PdfNode({ id, data }: NodeProps<NodeData>) 
   const c = data.object.content as { filename?: string; pageCount?: number; pdfUrl?: string; abstract?: string; text?: string };
   const src = a.pdfUrl(id) ?? c.pdfUrl;
   const body = String(c.abstract ?? c.text ?? "");
-  const [pages, setPages] = useState(c.pageCount ?? 0);
+  const pages = c.pageCount ?? 0;
   const [page, setPage] = useState(1);
-  const onPages = useCallback((count: number) => {
-    setPages(count);
-    setPage((current) => Math.min(current, count));
-  }, []);
   const go = (delta: number) => setPage((p) => Math.min(Math.max(1, p + delta), pages || Math.max(p + delta, 1)));
 
   return (
@@ -90,7 +85,9 @@ export const PdfNode = memo(function PdfNode({ id, data }: NodeProps<NodeData>) 
       </div>
       {src ? (
         <div className="doc-crop">
-          <PdfPage url={src} page={page} onPages={onPages} />
+          {/* The page fragment drives the embedded viewer, so paging does not
+              need the PDF to be re-fetched. */}
+          <iframe key={page} src={`${src}#page=${page}&view=Fit&toolbar=0&navpanes=0`} title={data.object.title ?? "PDF"} />
         </div>
       ) : (
         <div className="doc-body">{body || "Open to read"}</div>

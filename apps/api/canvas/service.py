@@ -112,13 +112,8 @@ def create_edge(
             CanvasObject.id.in_([source_object_id, target_object_id]),
         )
     ).scalars().all()
-    missing = {source_object_id, target_object_id} - set(objs)
-    if missing:
-        # Name them: "both objects must exist" gave no way to tell a typo from a
-        # board whose objects were written to a different database.
-        raise ValueError(
-            f"not on canvas {canvas_id}: {', '.join(str(m) for m in sorted(missing, key=str))}"
-        )
+    if set(objs) != {source_object_id, target_object_id}:
+        raise ValueError("both objects must exist on the same canvas")
 
     edge = ObjectEdge(
         canvas_id=canvas_id,

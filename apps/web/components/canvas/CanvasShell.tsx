@@ -28,7 +28,7 @@ import { ContextMenu, type MenuAction } from "../menu/ContextMenu";
 import { CommandPalette, type PaletteAction } from "../search/CommandPalette";
 import { SidePanel, type PanelTab } from "../panel/SidePanel";
 import { Viewer, type Selection, type SelectionAction } from "../panel/Viewer";
-import { ChatPanel, ContextChips, type ChatContext } from "../panel/ChatPanel";
+import { ChatPanel } from "../panel/ChatPanel";
 
 const nodeTypes = { paper: PaperNode, suggestion: SuggestionNode, ai: AiNoteNode, note: NoteNode, excerpt: ExcerptNode, thread: ThreadNode, pdf: PdfNode, group: GroupNode, image: ImageNode, video: VideoNode, audio: AudioNode, doc: DocNode, embed: EmbedNode };
 
@@ -98,10 +98,6 @@ export function CanvasShell({ id }: { id: string }) {
   const edges = useMemo(() => doc?.edges ?? [], [doc]);
   const selected = useMemo(() => nodes.filter((n) => n.selected && n.type !== "suggestion"), [nodes]);
   const selectedIds = useMemo(() => new Set(selected.map((n) => n.id)), [selected]);
-  // Selection IS the chat's context (PRD §15 priority 1), so it is named, not
-  // counted: the user has to see which objects the answer will be about.
-  const label = (n: Node<NodeData>) => n.data.object.title || String(n.data.object.content.text ?? "").slice(0, 40) || "Untitled";
-  const chatContext: ChatContext[] = useMemo(() => selected.map((n) => ({ id: n.id, title: label(n), kind: n.type ?? "note" })), [selected]);
   const byId = useCallback((nid: string) => nodes.find((n) => n.id === nid), [nodes]);
   const detail = detailId ? byId(detailId) : selected.length === 1 ? selected[0] : undefined;
 
@@ -347,21 +343,11 @@ export function CanvasShell({ id }: { id: string }) {
     try {
       const { object } = await api.addObject({ canvasId: doc.id, objectType: "PAPER", openalexId: s.paper.openalexId, title: s.paper.title, content: { openalexId: s.paper.openalexId, recommendedBy: s.anchorId, mode: s.mode, reason: s.reason }, x: g.position.x, y: g.position.y });
       const [src, tgt] = s.mode === "broader" ? [object.id, s.anchorId] : [s.anchorId, object.id];
-      // The paper is the point of accepting; the edge only records why it is
-      // here. If the anchor is not a row the server knows about — a board
-      // carried over from an earlier database, say — /edges rejects the pair,
-      // and refusing the whole accept over that loses the paper the user asked
-      // for. Draw the edge locally instead and keep going.
-      let edgeId = `local-${uid()}`;
-      try {
-        edgeId = (await api.addEdge({ canvasId: doc.id, sourceObjectId: src, targetObjectId: tgt, edgeType: "RELATED_TO" })).edge.id;
-      } catch {
-        /* keep the local edge */
-      }
+      const { edge } = await api.addEdge({ canvasId: doc.id, sourceObjectId: src, targetObjectId: tgt, edgeType: "RELATED_TO" });
       update((d) => ({
         ...d,
         nodes: [...d.nodes.filter((n) => n.id !== nid), toNode("paper", object, { paper: s.paper })],
-        edges: [...d.edges.filter((e) => e.source !== nid && e.target !== nid), { ...toEdge(edgeId, src, tgt, "RELATED_TO", "AI"), label: s.relationshipLabel, labelStyle: { fontSize: 10, fill: "var(--ink-4)" }, labelBgStyle: { fill: "var(--board)" } }],
+        edges: [...d.edges.filter((e) => e.source !== nid && e.target !== nid), { ...toEdge(edge.id, src, tgt, "RELATED_TO", "AI"), label: s.relationshipLabel, labelStyle: { fontSize: 10, fill: "var(--ink-4)" }, labelBgStyle: { fill: "var(--board)" } }],
       }));
     } catch (e) {
       fail("Accept")(e);
@@ -586,11 +572,6 @@ export function CanvasShell({ id }: { id: string }) {
   }, [byId, doc, recommend, showCitations, showStance, explain, chatAbout, selected, groupSelection, compressSelection, tuckNotes, addLocal, removeNodes, update, say, fail]);
 
   // ---- chat ----
-  const dropContext = useCallback((nid: string) => {
-    update((d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === nid ? { ...n, selected: false } : n)) }), false);
-  }, [update]);
-  const titleOf = useCallback((nid: string) => { const n = byId(nid); return n ? label(n) : undefined; }, [byId]);
-
   const send = useCallback(async () => {
     const text = draft.trim();
     if (!doc || !text || chatBusy) return;
@@ -829,12 +810,7 @@ export function CanvasShell({ id }: { id: string }) {
               {real.length === 0 && <EmptyState onSearch={() => setPalette({ open: true })} onUpload={() => fileInput.current?.click()} onDrop={addFiles} />}
               <form className="chatbar" onSubmit={(e) => { e.preventDefault(); setPanelOpen(true); setTab("Chat"); send(); }}>
                 {partial && <div className="chat-partial">{partial}</div>}
-                {chatContext.length > 0 && (
-                  <div className="chatbar-ctx">
-                    <ContextChips context={chatContext} onFocus={focusNode} onDrop={dropContext} />
-                  </div>
-                )}
-                <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={chatContext.length ? `Ask about ${chatContext.length === 1 ? "“" + chatContext[0].title.slice(0, 28) + "”" : chatContext.length + " selected objects"}` : "Ask anything"} aria-label="Ask about this canvas" onFocus={() => { setPanelOpen(true); setTab("Chat"); }} />
+                <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask anything" aria-label="Ask about this canvas" onFocus={() => { setPanelOpen(true); setTab("Chat"); }} />
                 <button type="button" className="voice" aria-pressed={recording} onClick={toggleMic} title={recording ? "Stop recording" : "Voice input"}>
                   {recording
                     ? <span className="waves" aria-hidden><i /><i /><i /><i /><i /></span>
@@ -862,8 +838,7 @@ export function CanvasShell({ id }: { id: string }) {
                 ) : null}
                 chat={
                   <ChatPanel
-                    messages={doc.chat} context={chatContext} titleOf={titleOf}
-                    onFocusContext={focusNode} onDropContext={dropContext}
+                    messages={doc.chat} contextTitles={selected.map((n) => n.data.object.title ?? String(n.data.object.content.text ?? "").slice(0, 40))}
                     busy={chatBusy} draft={draft} onDraft={setDraft} onSend={send} onSaveNote={saveNote} onSaveThread={saveThread} onReadAloud={readAloud} onMic={toggleMic} recording={recording}
                   />
                 }
