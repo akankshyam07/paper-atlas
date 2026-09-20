@@ -21,19 +21,11 @@ export function QuickActions({ id }: { id: string }) {
 export const viaProxy = (url?: string) =>
   !url ? undefined : url.startsWith("/") ? url : `/api/proxy/pdf?url=${encodeURIComponent(url)}`;
 
-function Pager({ page, pages, onPrev, onNext, spread }: {
-  page: number; pages?: number; onPrev: () => void; onNext: () => void; spread?: boolean;
-}) {
-  return (
-    <div className="pager nodrag" role="group" aria-label="Page navigation">
-      <button onClick={onPrev} disabled={page <= 1} aria-label="Previous page">‹</button>
-      <span className="pager-count">
-        {spread ? `${page}–${page + 1}` : page}{pages ? ` / ${pages}` : ""}
-      </span>
-      <button onClick={onNext} disabled={!!pages && page >= pages} aria-label="Next page">›</button>
-    </div>
-  );
-}
+// Each pane gets its own document instance. Two iframes pointing at one url
+// that differ only by #page can share the loaded document, which is why a
+// spread showed the same page twice.
+const pageSrc = (src: string, page: number, fit: "Fit" | "FitH") =>
+  `${src}${src.includes("?") ? "&" : "?"}pane=${page}#page=${page}&view=${fit}&toolbar=0&navpanes=0&scrollbar=0`;
 
 export const PaperNode = memo(function PaperNode({ id, data }: NodeProps<NodeData>) {
   const p = data.paper;
@@ -42,10 +34,12 @@ export const PaperNode = memo(function PaperNode({ id, data }: NodeProps<NodeDat
     authors?: string[]; type?: string; pageCount?: number;
   };
   const src = viaProxy(c.pdfUrl);
-  // Books read as a spread; papers are a single column.
   const isBook = (c.type ?? "").includes("book");
   const [page, setPage] = useState(1);
   const [flip, setFlip] = useState<"none" | "fwd" | "back">("none");
+  // Reading mode hands the document its own scrolling and text selection. Off
+  // by default so the node still drags and right-clicks like a card.
+  const [reading, setReading] = useState(false);
   const step = isBook ? 2 : 1;
 
   const turn = (dir: 1 | -1) => {
@@ -61,21 +55,28 @@ export const PaperNode = memo(function PaperNode({ id, data }: NodeProps<NodeDat
   ].filter(Boolean).join(" · ");
 
   return (
-    <div className={`node sheet${isBook ? " book" : ""}`} title="Right-click for Broader, Deeper and more · double-click to open">
+    <div className={`node sheet${isBook ? " book" : ""}${reading ? " reading" : ""}`}
+      title={reading ? "Reading — scroll the document" : "Right-click for Broader, Deeper and more"}>
       <QuickActions id={id} />
       <div className={`sheet-stage${isBook ? " spread" : ""} flip-${flip}`}>
         {src ? (
           isBook ? (
             <>
-              <div className="leaf left"><iframe key={`l${page}`} src={`${src}#page=${page}&view=Fit&toolbar=0&navpanes=0&scrollbar=0`} title={`${data.object.title} page ${page}`} /></div>
-              <div className="leaf right"><iframe key={`r${page}`} src={`${src}#page=${page + 1}&view=Fit&toolbar=0&navpanes=0&scrollbar=0`} title={`${data.object.title} page ${page + 1}`} /></div>
+              <div className="leaf left"><iframe key={`l${page}`} src={pageSrc(src, page, "Fit")} title={`${data.object.title} page ${page}`} /></div>
+              <div className="leaf right"><iframe key={`r${page}`} src={pageSrc(src, page + 1, "Fit")} title={`${data.object.title} page ${page + 1}`} /></div>
             </>
           ) : (
-            <div className="leaf"><iframe key={page} src={`${src}#page=${page}&view=Fit&toolbar=0&navpanes=0&scrollbar=0`} title={data.object.title ?? "Paper"} /></div>
+            <div className="leaf">
+              {/* In reading mode the whole document loads so it scrolls; the
+                  card view pins a single fitted page. */}
+              <iframe
+                key={reading ? "read" : `page-${page}`}
+                src={reading ? `${src}#toolbar=0&navpanes=0` : pageSrc(src, page, "Fit")}
+                title={data.object.title ?? "Paper"}
+              />
+            </div>
           )
         ) : (
-          // No open-access PDF: typeset the abstract so the node still reads as
-          // a page rather than an empty frame.
           <div className="leaf">
             <div className="sheet-fallback">
               <h4>{data.object.title}</h4>
@@ -89,7 +90,25 @@ export const PaperNode = memo(function PaperNode({ id, data }: NodeProps<NodeDat
         <div className="sheet-title" title={data.object.title ?? ""}>{data.object.title}</div>
         {meta && <div className="sheet-sub">{meta}</div>}
       </div>
-      {src && <Pager page={page} pages={c.pageCount} spread={isBook} onPrev={() => turn(-1)} onNext={() => turn(1)} />}
+      {src && (
+        <div className="pager nodrag" role="group" aria-label="Pages">
+          {!reading && (
+            <>
+              <button onClick={() => turn(-1)} disabled={page <= 1} aria-label="Previous page">‹</button>
+              <span className="pager-count">
+                {isBook ? `${page}–${page + 1}` : page}{c.pageCount ? ` / ${c.pageCount}` : ""}
+              </span>
+              <button onClick={() => turn(1)} disabled={!!c.pageCount && page >= c.pageCount} aria-label="Next page">›</button>
+            </>
+          )}
+          {!isBook && (
+            <button className="pager-mode" aria-pressed={reading} onClick={() => setReading((r) => !r)}
+              title={reading ? "Back to page view" : "Scroll the whole document"}>
+              {reading ? "Done" : "Read"}
+            </button>
+          )}
+        </div>
+      )}
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
     </div>

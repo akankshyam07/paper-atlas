@@ -546,3 +546,13 @@ a:hover { color: var(--accent-hover); }
 /* Controls layered over the preview stay clickable. */
 .node.sheet .node-actions, .node.sheet .pager,
 .node.doc .node-actions, .node.doc .pager { pointer-events: auto; }
+
+/* Reading mode: the document takes pointer events so it scrolls and text can be
+   selected. Outside it the preview stays a card, so the node drags and
+   right-clicks normally. */
+.node.sheet.reading .leaf, .node.sheet.reading .leaf iframe { pointer-events: auto; }
+.node.sheet.reading .leaf { box-shadow: 0 0 0 2px var(--accent), 0 10px 26px rgba(0,0,0,0.12); }
+.pager-mode { font-size: 11px; padding: 2px 9px; border-radius: 999px; color: var(--ink-3); }
+.pager-mode[aria-pressed="true"] { background: var(--accent); color: #fff; }
+/* The pager must stay reachable while the document below it is interactive. */
+.node.sheet .pager { pointer-events: auto; z-index: 5; }
