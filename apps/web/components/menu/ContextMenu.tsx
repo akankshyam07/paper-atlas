@@ -5,11 +5,14 @@ import type { NodeKind } from "../../lib/store";
 
 export type MenuAction =
   | "broader" | "deeper" | "related" | "references" | "citedBy"
+  | "supporting" | "contradicting"
   | "explain" | "summarize" | "chat"
   | "link" | "group" | "duplicate" | "remove";
 
 const EXPLORE: [MenuAction, string][] = [
-  ["broader", "Broader"], ["deeper", "Deeper"], ["related", "Related papers"], ["references", "References"], ["citedBy", "Cited by"],
+  ["broader", "Broader"], ["deeper", "Deeper"], ["related", "Related papers"],
+  ["supporting", "Supporting work"], ["contradicting", "Contradicting work"],
+  ["references", "References"], ["citedBy", "Cited by"],
 ];
 const AI: [MenuAction, string][] = [["explain", "Explain"], ["summarize", "Summarize"], ["chat", "Chat about this"]];
 const ORGANIZE: [MenuAction, string][] = [["link", "Link to selection"], ["group", "Group selection"], ["duplicate", "Duplicate"], ["remove", "Remove from canvas"]];

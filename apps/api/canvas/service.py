@@ -129,6 +129,7 @@ def ingest_file(
     origin: str = "upload",
     x: float = 0.0,
     y: float = 0.0,
+    storage_key: str | None = None,
 ) -> CanvasObject:
     """The one ingestion path for uploads AND Dropbox imports.
 
@@ -140,11 +141,14 @@ def ingest_file(
 
     entity = resolve_or_create_source_entity(
         db, source_type="UPLOADED_FILE", external_id=None, title=filename,
-        metadata={"filename": filename, "size_bytes": len(data), "origin": origin},
+        metadata={"filename": filename, "size_bytes": len(data), "origin": origin,
+                  "storage_key": storage_key},
     )
     return create_object(
         db, canvas_id=canvas_id, object_type="PDF", title=filename,
-        content={"filename": filename, "origin": origin, "sizeBytes": len(data)},
+        content={"filename": filename, "origin": origin, "sizeBytes": len(data),
+                 "storageKey": storage_key,
+                 "pdfUrl": f"/api/files/{storage_key}" if storage_key else None},
         source_entity_id=entity.id, x=x, y=y,
     )
 
@@ -198,3 +202,40 @@ def cache_openalex_work(db: Session, *, source_entity_id: uuid.UUID, work: dict)
     row.open_access = work.get("open_access") or {}
     row.content_urls = {"pdf": mapping.pdf_url(work)}
     db.commit()
+
+
+def suppress_candidate(db: Session, *, canvas_id: uuid.UUID, mode: str, openalex_id: str) -> None:
+    from models.entities import Suppression
+
+    ensure_canvas(db, canvas_id)
+    exists = db.execute(
+        select(Suppression.id).where(
+            Suppression.canvas_id == canvas_id,
+            Suppression.mode == mode,
+            Suppression.openalex_id == openalex_id,
+        )
+    ).first()
+    if exists:
+        return
+    db.add(Suppression(canvas_id=canvas_id, mode=mode, openalex_id=openalex_id))
+    db.commit()
+
+
+def suppressed_ids(db: Session, canvas_id: uuid.UUID, mode: str) -> set[str]:
+    from models.entities import Suppression
+
+    rows = db.execute(
+        select(Suppression.openalex_id).where(
+            Suppression.canvas_id == canvas_id, Suppression.mode == mode
+        )
+    ).scalars().all()
+    return set(rows)
+
+
+def list_objects(db: Session, canvas_id: uuid.UUID, *, limit: int = 50) -> list[CanvasObject]:
+    return db.execute(
+        select(CanvasObject)
+        .where(CanvasObject.canvas_id == canvas_id, CanvasObject.deleted_at.is_(None))
+        .order_by(CanvasObject.created_at.desc())
+        .limit(limit)
+    ).scalars().all()

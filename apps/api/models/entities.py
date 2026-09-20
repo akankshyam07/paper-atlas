@@ -142,3 +142,18 @@ class Chunk(Base):
     page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # embedding VECTOR(1536) added by migration 0002 (needs pgvector extension)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Suppression(Base):
+    """A rejected recommendation, per canvas and direction (PRD §13.5).
+
+    Kept server-side so a rejection is not resurfaced on another browser, and so
+    the recommender can exclude it before scoring rather than after.
+    """
+    __tablename__ = "suppressions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    canvas_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("canvases.id", ondelete="CASCADE"), nullable=False, index=True)
+    mode: Mapped[str] = mapped_column(String, nullable=False)
+    openalex_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

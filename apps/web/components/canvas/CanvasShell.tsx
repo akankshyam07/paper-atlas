@@ -204,6 +204,21 @@ export function CanvasShell({ id }: { id: string }) {
     }
   }, [doc, byId, say, fail, placeGhosts]);
 
+  const showStance = useCallback(async (anchorId: string, stance: "supporting" | "contradicting") => {
+    if (!doc) return;
+    const anchor = byId(anchorId);
+    if (!anchor) return;
+    try {
+      const { recommendations } = await api.stance({ objectId: anchorId, stance });
+      const fresh = recommendations.filter((r) => !isSuppressed(doc, "deeper", r.paper.openalexId)).slice(0, 3);
+      if (!placeGhosts(anchorId, anchor, "deeper", fresh)) {
+        say(`No ${stance} work found for this paper.`);
+      }
+    } catch (e) {
+      fail("Stance")(e);
+    }
+  }, [doc, byId, say, fail, placeGhosts]);
+
   const showCitations = useCallback(async (anchorId: string, direction: CitationDirection) => {
     if (!doc) return;
     const anchor = byId(anchorId);
@@ -254,9 +269,14 @@ export function CanvasShell({ id }: { id: string }) {
 
   const rejectSuggestion = useCallback((nid: string) => {
     const s = byId(nid)?.data.suggestion;
-    if (!s) return;
+    if (!s || !doc) return;
+    // Record the rejection server-side too, so it survives a different browser
+    // and the recommender can exclude it before scoring (PRD §13.5).
+    if (s.paper.openalexId) {
+      void api.suppress({ canvasId: doc.id, mode: s.mode, openalexId: s.paper.openalexId }).catch(() => {});
+    }
     update((d) => ({ ...d, rejected: [...d.rejected, `${s.mode}:${s.paper.openalexId}`], nodes: d.nodes.filter((n) => n.id !== nid), edges: d.edges.filter((e) => e.source !== nid && e.target !== nid) }));
-  }, [byId, update]);
+  }, [byId, update, doc]);
 
   // ---- organize ----
   const groupSelection = useCallback(() => {
@@ -288,6 +308,7 @@ export function CanvasShell({ id }: { id: string }) {
     if (!n || !doc) return;
     switch (a) {
       case "broader": case "deeper": return recommend(nid, a);
+      case "supporting": case "contradicting": return showStance(nid, a);
       case "references": return showCitations(nid, "out");
       case "citedBy": return showCitations(nid, "in");
       case "related": return showCitations(nid, "related");
@@ -307,7 +328,7 @@ export function CanvasShell({ id }: { id: string }) {
       }
       case "remove": return removeNodes([nid]);
     }
-  }, [byId, doc, recommend, showCitations, explain, chatAbout, selected, groupSelection, addLocal, removeNodes, update, say, fail]);
+  }, [byId, doc, recommend, showCitations, showStance, explain, chatAbout, selected, groupSelection, addLocal, removeNodes, update, say, fail]);
 
   // ---- chat ----
   const send = useCallback(async () => {
@@ -319,11 +340,10 @@ export function CanvasShell({ id }: { id: string }) {
     setDraft("");
     setChatBusy(true);
     try {
-      // ponytail: /explain is the only LLM endpoint in the contract; swap for a
-      // chat endpoint when backend-ai adds one. Selected nodes go as context.
-      const ctx = selected.map((n) => `${n.data.object.title ?? ""}\n${n.data.object.content.text ?? ""}`.trim()).filter(Boolean).join("\n---\n");
-      const { object } = await api.explain({ canvasId: doc.id, objectId: contextIds[0], text: ctx ? `${text}\n\nContext:\n${ctx}` : text });
-      update((d) => ({ ...d, chat: [...d.chat, { id: uid(), role: "assistant", text: String(object.content.text ?? ""), contextIds }] }), false);
+      // The server assembles context by PRD §15 priority (selection, then graph
+      // neighbours, then canvas), so we send ids rather than pasted text.
+      const { reply } = await api.chat({ canvasId: doc.id, message: text, selectedObjectIds: contextIds });
+      update((d) => ({ ...d, chat: [...d.chat, { id: uid(), role: "assistant", text: reply, contextIds }] }), false);
     } catch (e) {
       fail("Chat")(e);
     } finally {
@@ -382,15 +402,27 @@ export function CanvasShell({ id }: { id: string }) {
   }, [fail, say]);
 
   // ---- files ----
-  const addFiles = useCallback((files: FileList | File[], at?: { x: number; y: number }) => {
+  const addFiles = useCallback(async (files: FileList | File[], at?: { x: number; y: number }) => {
     if (!doc) return;
     const pos = at ?? centre();
-    Array.from(files).filter((f) => f.type === "application/pdf" || f.name.endsWith(".pdf")).forEach((f, i) => {
-      const object = mkObject(doc.id, "PAPER", f.name.replace(/\.pdf$/i, ""), { filename: f.name, sizeBytes: f.size, origin: "upload" }, pos.x + i * 30, pos.y + i * 30);
-      pdfBlobs.set(object.id, URL.createObjectURL(f));
-      addLocal("pdf", object);
-    });
-  }, [doc, centre, addLocal]);
+    const pdfs = Array.from(files).filter((f) => f.type === "application/pdf" || f.name.endsWith(".pdf"));
+    for (const [i, f] of pdfs.entries()) {
+      const local = URL.createObjectURL(f);
+      try {
+        // Upload so the file survives a reload; the blob url still gives an
+        // instant preview for this session.
+        const { object } = await api.upload(f, doc.id, pos.x + i * 30, pos.y + i * 30);
+        pdfBlobs.set(object.id, local);
+        update((d) => ({ ...d, nodes: [...d.nodes, toNode("pdf", object)] }));
+      } catch (e) {
+        // Keep the card even if the upload fails — the user still has the file.
+        const object = mkObject(doc.id, "PDF", f.name.replace(/\.pdf$/i, ""), { filename: f.name, sizeBytes: f.size, origin: "upload" }, pos.x + i * 30, pos.y + i * 30);
+        pdfBlobs.set(object.id, local);
+        addLocal("pdf", object);
+        fail("Upload")(e);
+      }
+    }
+  }, [doc, centre, addLocal, update, fail]);
 
   // ---- selection menu actions (PRD §10) ----
   const onSelectionAction = useCallback(async (a: SelectionAction, sel: Selection) => {
@@ -401,6 +433,7 @@ export function CanvasShell({ id }: { id: string }) {
         case "explain": case "summarize": { const ex = await addExcerpt(sel); if (ex) await explain(ex.id, sel.text, a === "explain" ? "Explanation" : "Summary"); return; }
         case "ask": setDraft(sel.text); setTab("Chat"); return;
         case "related": setPalette({ open: true, query: sel.text.slice(0, 120) }); return;
+        case "supporting": case "contradicting": return showStance(sel.objectId, a);
       }
     } catch (e) { fail("Action")(e); }
   }, [addExcerpt, addNote, explain, say, fail]);

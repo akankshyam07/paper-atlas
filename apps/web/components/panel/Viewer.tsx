@@ -10,7 +10,7 @@ import type { Node } from "reactflow";
 import type { NodeData } from "../../lib/store";
 
 export type Selection = { text: string; objectId: string; start: number; end: number };
-export type SelectionAction = "highlight" | "note" | "explain" | "summarize" | "ask" | "related";
+export type SelectionAction = "highlight" | "note" | "explain" | "summarize" | "ask" | "related" | "supporting" | "contradicting";
 
 const TABS = ["Abstract", "References", "Cited by", "Topics"] as const;
 
@@ -19,7 +19,7 @@ export function Viewer({ node, edges, pdfUrl, onSelectionAction, onAction }: {
   edges: { label: string; title: string; id: string }[];
   pdfUrl?: string;
   onSelectionAction: (a: SelectionAction, s: Selection) => void;
-  onAction: (a: "broader" | "deeper" | "explain" | "chat") => void;
+  onAction: (a: "broader" | "deeper" | "explain" | "chat" | "supporting" | "contradicting") => void;
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Abstract");
   const [cites, setCites] = useState<{ loading: boolean; items: PaperPreview[] }>({ loading: false, items: [] });
@@ -124,6 +124,8 @@ export function Viewer({ node, edges, pdfUrl, onSelectionAction, onAction }: {
       <div className="viewer-actions">
         {p && <button className="btn" onClick={() => onAction("broader")}>Broader</button>}
         {p && <button className="btn" onClick={() => onAction("deeper")}>Deeper</button>}
+        {p && <button className="btn" onClick={() => onAction("supporting")}>Supporting</button>}
+        {p && <button className="btn" onClick={() => onAction("contradicting")}>Contradicting</button>}
         <button className="btn" onClick={() => onAction("explain")}>Explain</button>
         <button className="btn primary" onClick={() => onAction("chat")}>Chat about this</button>
       </div>
@@ -143,8 +145,8 @@ export function Viewer({ node, edges, pdfUrl, onSelectionAction, onAction }: {
           <div className="eyebrow">Research</div>
           <div className="group">
             <button className="chip click solid" onClick={() => act("related")}>Related</button>
-            <button className="chip click" disabled title="Needs a supporting/contradicting endpoint">Supporting</button>
-            <button className="chip click" disabled title="Needs a supporting/contradicting endpoint">Contradicting</button>
+            <button className="chip click" onClick={() => act("supporting")}>Supporting</button>
+            <button className="chip click" onClick={() => act("contradicting")}>Contradicting</button>
           </div>
         </div>
       )}

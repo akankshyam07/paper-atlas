@@ -36,3 +36,4 @@ test-results/
 # Next.js build artifacts
 apps/web/next-env.d.ts
 apps/web/tsconfig.tsbuildinfo
+.storage/

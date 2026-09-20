@@ -15,10 +15,13 @@ from sqlalchemy.orm import Session
 from canvas import service
 from db.session import get_db
 from intel import explain as explain_mod
+from intel.recommend import discover as run_discover
 from intel.recommend import recommend as run_recommend
+from intel.recommend import stance_candidates
 from openalex import mapping
 from providers.registry import get_research_data
 from schemas import (
+    StanceRequest, ChatRequest, ChatResponse,
     SearchResponse, PaperPreview,
     RecommendRequest, RecommendResponse, Recommendation,
     ExplainRequest, ExplainResponse, CanvasObject, ObjectEdge,
@@ -84,6 +87,8 @@ def recommend(req: RecommendRequest, db: Session = Depends(get_db)) -> Recommend
 
     # Suppress anything already on the canvas (loop avoidance, PRD §13.5).
     exclude = service.canvas_openalex_ids(db, canvas_id) if canvas_id else set()
+    if canvas_id:
+        exclude |= service.suppressed_ids(db, canvas_id, req.mode)
 
     recs = run_recommend(
         openalex_id=openalex_id,
@@ -101,6 +106,73 @@ def recommend(req: RecommendRequest, db: Session = Depends(get_db)) -> Recommend
         )
         for r in recs
     ])
+
+
+@router.post("/stance", response_model=RecommendResponse)
+def stance(req: StanceRequest, db: Session = Depends(get_db)) -> RecommendResponse:
+    """Supporting or contradicting work for a paper (PRD §13)."""
+    openalex_id, canvas_id = _resolve_openalex_id(db, req.objectId)
+    if not openalex_id:
+        return RecommendResponse(recommendations=[])
+    exclude = service.canvas_openalex_ids(db, canvas_id) if canvas_id else set()
+    recs = stance_candidates(openalex_id=openalex_id, stance=req.stance, exclude_ids=exclude)
+    return RecommendResponse(recommendations=[Recommendation(
+        paper=PaperPreview(**r["paper"]), mode=r["mode"],
+        relationshipLabel=r["relationshipLabel"], reason=r["reason"], score=r["score"],
+    ) for r in recs])
+
+
+@router.get("/discover", response_model=RecommendResponse)
+def discover_route(q: str, kind: str = "foundational", limit: int = 5) -> RecommendResponse:
+    """Foundational or recent work for a topic (PRD §14)."""
+    recs = run_discover(query=q, kind=kind, limit=limit)
+    return RecommendResponse(recommendations=[Recommendation(
+        paper=PaperPreview(**r["paper"]), mode=r["mode"],
+        relationshipLabel=r["relationshipLabel"], reason=r["reason"], score=r["score"],
+    ) for r in recs])
+
+
+@router.post("/chat", response_model=ChatResponse)
+def chat(req: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
+    """Canvas chat. Context follows the PRD §15 retrieval priority: the user's
+    selection first, then graph neighbours, then the rest of the canvas."""
+    from providers.registry import get_inference_optimizer, get_llm
+
+    parts: list[str] = []
+    seen: set[str] = set()
+
+    def add(obj, tag: str) -> None:
+        if obj is None or str(obj.id) in seen:
+            return
+        seen.add(str(obj.id))
+        body = (obj.content or {}).get("abstract") or (obj.content or {}).get("text") or ""
+        parts.append(f"[{tag}] {obj.title or ''}\n{str(body)[:900]}".strip())
+
+    canvas_uuid = _as_uuid(req.canvasId)
+    # 1. explicit selection outranks everything else
+    for oid in (req.selectedObjectIds or [])[:6]:
+        u = _as_uuid(oid)
+        if u:
+            add(service.get_object(db, u), "selected")
+    # 2. graph neighbours of the selection
+    for oid in (req.selectedObjectIds or [])[:2]:
+        u = _as_uuid(oid)
+        if u:
+            for n in service.get_neighbors(db, u, depth=1)[:4]:
+                add(n, "linked")
+    # 3. the rest of the canvas, only to fill remaining budget
+    if canvas_uuid and len(parts) < 4:
+        for o in service.list_objects(db, canvas_uuid, limit=6):
+            add(o, "canvas")
+
+    context = "\n\n---\n\n".join(parts[:8])
+    prompt = (f"Canvas context:\n{context}\n\n" if context else "") + f"Question: {req.message}"
+    answer = get_llm().complete(
+        get_inference_optimizer().optimize(prompt),
+        system=("You answer questions about the user's research canvas. Ground every "
+                "claim in the provided context. If the context does not answer it, say so."),
+    )
+    return ChatResponse(reply=answer, contextObjectIds=list(seen))
 
 
 @router.post("/explain", response_model=ExplainResponse)

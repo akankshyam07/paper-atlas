@@ -124,3 +124,25 @@ class TranscribeResponse(BaseModel):
 
 class SynthesizeRequest(BaseModel):
     text: str
+
+
+class SuppressRequest(BaseModel):
+    canvasId: str
+    mode: RecommendMode
+    openalexId: str
+
+
+class StanceRequest(BaseModel):
+    objectId: str
+    stance: str  # "supporting" | "contradicting"
+
+
+class ChatRequest(BaseModel):
+    canvasId: str
+    message: str
+    selectedObjectIds: list[str] = []
+
+
+class ChatResponse(BaseModel):
+    reply: str
+    contextObjectIds: list[str]

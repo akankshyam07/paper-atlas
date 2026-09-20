@@ -19,12 +19,14 @@ from __future__ import annotations
 
 import math
 import re
+from datetime import date
 from typing import Any
 
 from openalex import mapping
 from openalex.client import OpenAlexProvider
 
 RECOMMENDATION_COUNT = 3
+CURRENT_YEAR = date.today().year
 # Topic-pool candidates below this shared-substance score are dropped.
 MIN_TOPIC_RELEVANCE = 0.06
 
@@ -271,3 +273,106 @@ def _reason(cand: dict[str, Any], source: dict[str, Any], mode: str) -> str:
         if shared:
             bits.append("shares " + ", ".join(sorted(shared)[:2]))
     return "; ".join(bits) or ("broader framing" if mode == "broader" else "more specific")
+
+
+# ---- Supporting / Contradicting (PRD §13) ----
+# Deterministic retrieval first: both draw on work citing the paper plus
+# semantic neighbours. An LLM then classifies the stance, because agreement and
+# disagreement are not visible in metadata — but it only labels a small
+# candidate set, it never discovers one.
+
+_STANCE_LABELS = ["SUPPORTING", "CONTRADICTING", "NEITHER"]
+
+
+def stance_candidates(
+    *, openalex_id: str, stance: str, limit: int = 3,
+    exclude_ids: set[str] | None = None, client: OpenAlexProvider | None = None,
+) -> list[dict[str, Any]]:
+    from providers.registry import get_llm
+
+    client = client or OpenAlexProvider()
+    exclude = {mapping.short_id(i) for i in (exclude_ids or set())}
+    source = client.get_work(openalex_id)
+    if not source:
+        return []
+    exclude.add(mapping.short_id(source.get("id")))
+
+    pool: list[dict[str, Any]] = list(client.get_citations(openalex_id, direction="in"))
+    abstract = mapping.abstract_text(source.get("abstract_inverted_index"))
+    if abstract:
+        pool += client.search_works(abstract[:1000], mode="semantic", per_page=10)
+
+    seen: set[str] = set()
+    ranked: list[tuple[float, dict[str, Any]]] = []
+    for cand in pool:
+        cid = mapping.short_id(cand.get("id"))
+        if not cid or cid in seen or cid in exclude:
+            continue
+        seen.add(cid)
+        ranked.append((_relevance(cand, source), cand))
+    ranked.sort(key=lambda r: r[0], reverse=True)
+
+    want = stance.upper()
+    llm = get_llm()
+    src_title = source.get("title") or source.get("display_name") or ""
+    out: list[dict[str, Any]] = []
+    # Classify only the strongest few, so cost stays bounded.
+    for _, cand in ranked[:8]:
+        if len(out) >= limit:
+            break
+        cand_title = cand.get("title") or cand.get("display_name") or ""
+        verdict = llm.classify(
+            f"Paper A: {src_title}\nPaper B: {cand_title}\n\n"
+            "Does B support A's claims, contradict them, or neither?",
+            _STANCE_LABELS,
+        )
+        # A stub classifier always returns the first label, so without a real
+        # LLM this degrades to relevance order rather than inventing a stance.
+        if verdict != want and llm.__class__.__name__ != "StubLLM":
+            continue
+        out.append({
+            "paper": mapping.to_paper_preview(cand),
+            "mode": "deeper",
+            "relationshipLabel": want.lower(),
+            "reason": f"cites this work; classified {verdict.lower()}",
+            "score": 0.0,
+        })
+    return out
+
+
+# ---- Foundational / Recent discovery (PRD §14) ----
+
+def discover(*, query: str, kind: str = "foundational", limit: int = 5,
+             client: OpenAlexProvider | None = None) -> list[dict[str, Any]]:
+    """Blended ranking, not raw citation count (PRD §14)."""
+    client = client or OpenAlexProvider()
+    if kind == "recent":
+        works = client.search_works(query, per_page=40)
+        scored = []
+        for w in works:
+            year = w.get("publication_year") or 0
+            if year < CURRENT_YEAR - 2:
+                continue
+            # Recency plus citation velocity, so a brand-new paper is not
+            # punished for having few total citations.
+            velocity = (w.get("cited_by_count") or 0) / max(1, CURRENT_YEAR - year + 1)
+            scored.append((0.6 * (year - (CURRENT_YEAR - 3)) + 0.4 * math.log10(1 + velocity), w))
+    else:
+        works = client.search_works(query, per_page=40)
+        scored = []
+        for w in works:
+            cites = math.log10(1 + (w.get("cited_by_count") or 0))
+            age = max(0, CURRENT_YEAR - (w.get("publication_year") or CURRENT_YEAR))
+            survey = 1.2 if _looks_like_survey(w) else 0.0
+            # Influence and staying power, with a nod to surveys — not citations alone.
+            scored.append((cites + survey + min(age, 25) / 25.0, w))
+
+    scored.sort(key=lambda s: s[0], reverse=True)
+    return [{
+        "paper": mapping.to_paper_preview(w),
+        "mode": "broader" if kind == "foundational" else "deeper",
+        "relationshipLabel": kind,
+        "reason": (f"{w.get('cited_by_count', 0):,} citations"
+                   + (f" · {w.get('publication_year')}" if w.get("publication_year") else "")),
+        "score": round(score, 3),
+    } for score, w in scored[:limit]]

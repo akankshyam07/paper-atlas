@@ -16,6 +16,7 @@ from models.entities import CanvasObject as CanvasObjectModel
 from openalex import mapping
 from providers.registry import get_research_data
 from schemas import (
+    SuppressRequest,
     AddObjectRequest, AddObjectResponse,
     AddEdgeRequest, AddEdgeResponse,
     CanvasObject, ObjectEdge,
@@ -53,6 +54,29 @@ class CreateCanvasResponse(BaseModel):
 def create_canvas(req: CreateCanvasRequest, db: Session = Depends(get_db)) -> CreateCanvasResponse:
     c = service.create_canvas(db, title=req.title)
     return CreateCanvasResponse(id=str(c.id), title=c.title)
+
+
+@router.delete("/canvas/{canvas_id}")
+def delete_canvas(canvas_id: str, db: Session = Depends(get_db)) -> dict:
+    """Soft delete: the row stays so provenance and any shared links survive."""
+    from datetime import datetime, timezone
+    from models.entities import Canvas
+
+    canvas = db.get(Canvas, uuid.UUID(canvas_id))
+    if canvas is None:
+        raise HTTPException(status_code=404, detail="canvas not found")
+    canvas.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"deleted": canvas_id}
+
+
+@router.post("/suppressions")
+def suppress(req: SuppressRequest, db: Session = Depends(get_db)) -> dict:
+    """Record a rejected recommendation so it is not resurfaced (PRD §13.5).
+    Server-side, so a rejection survives a different browser."""
+    service.suppress_candidate(db, canvas_id=uuid.UUID(req.canvasId),
+                               mode=req.mode, openalex_id=req.openalexId)
+    return {"suppressed": req.openalexId}
 
 
 @router.post("/objects", response_model=AddObjectResponse)

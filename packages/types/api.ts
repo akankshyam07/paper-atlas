@@ -142,3 +142,35 @@ export interface SynthesizeRequest {
 // OpenAlex related_works. Returns previews; adding to the canvas stays explicit.
 export type CitationDirection = "out" | "in" | "related";
 // response shape is SearchResponse
+
+// POST /chat -> owner: backend-ai. Context follows the PRD §15 priority:
+// selection, then graph neighbours, then the rest of the canvas.
+export interface ChatRequest {
+  canvasId: string;
+  message: string;
+  selectedObjectIds?: string[];
+}
+export interface ChatResponse {
+  reply: string;
+  contextObjectIds: string[];
+}
+
+// POST /stance -> supporting/contradicting work (PRD §13). Returns RecommendResponse.
+export interface StanceRequest {
+  objectId: string;
+  stance: "supporting" | "contradicting";
+}
+
+// POST /suppressions -> record a rejected candidate so it is not resurfaced (§13.5)
+export interface SuppressRequest {
+  canvasId: string;
+  mode: RecommendMode;
+  openalexId: string;
+}
+
+// POST /canvas, DELETE /canvas/{id}
+export interface CreateCanvasRequest { title: string }
+export interface CreateCanvasResponse { id: string; title: string }
+
+// POST /files (multipart: file, canvasId, x, y) -> { object, url }
+export interface UploadResponse { object: CanvasObject; url: string }
