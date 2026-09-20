@@ -497,3 +497,11 @@ a:hover { color: var(--accent-hover); }
 .concept-head b { flex: 1; font-size: 13px; }
 .concept-card p { margin: 0 0 10px; font-size: 12px; line-height: 1.5; color: var(--ink-3); }
 .concept-card a.chip { text-decoration: none; }
+
+/* Grouped objects nest under their group in the navigator. */
+.nav-item.nested { padding-left: 26px; }
+.nav-item.nested::before { content: ""; position: absolute; left: 14px; top: 0; bottom: 0;
+  width: 1px; background: var(--line-2); }
+.nav-item { position: relative; }
+.nav-count { margin-left: auto; font-size: 10px; color: var(--ink-5);
+  background: var(--bg-2); border-radius: 999px; padding: 1px 6px; }

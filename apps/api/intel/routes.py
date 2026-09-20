@@ -132,6 +132,33 @@ def discover_route(q: str, kind: str = "foundational", limit: int = 5) -> Recomm
     ) for r in recs])
 
 
+@router.get("/random", response_model=SearchResponse)
+def random_work(topic: str | None = None, seed: int | None = None) -> SearchResponse:
+    """A random well-cited paper, optionally within a topic.
+
+    OpenAlex has no random endpoint, so this pages into a filtered, sorted
+    result set at a random offset — cheap, and it keeps returning real work
+    rather than obscure noise.
+    """
+    import random as _r
+
+    rng = _r.Random(seed)
+    provider = get_research_data()
+    query = topic or rng.choice([
+        "machine learning", "neuroscience", "climate", "quantum computing",
+        "genomics", "economics", "materials science", "epidemiology",
+    ])
+    # A deep page can fall past the end of a result set, and OpenAlex
+    # occasionally times out, so try a few shallower attempts before giving up
+    # rather than handing back an empty result.
+    for attempt in range(4):
+        page = rng.randint(1, 5 - attempt)
+        works = provider.search_works(query, per_page=25, page=page)
+        if works:
+            return SearchResponse(results=[PaperPreview(**mapping.to_paper_preview(rng.choice(works)))])
+    return SearchResponse(results=[])
+
+
 @router.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     """Canvas chat. Context follows the PRD §15 retrieval priority: the user's

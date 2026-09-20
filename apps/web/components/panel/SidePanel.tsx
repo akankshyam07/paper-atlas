@@ -41,7 +41,23 @@ function Navigator({ nodes, selectedIds, onFocus }: { nodes: Node<NodeData>[]; s
     .filter((n) => !kinds || kinds.includes(n.type as NodeKind))
     .filter((n) => !term || (n.data.object.title ?? "").toLowerCase().includes(term) || String(n.data.object.content.text ?? "").toLowerCase().includes(term))
     .sort((a, b) => sort === "title" ? (a.data.object.title ?? "").localeCompare(b.data.object.title ?? "") : sort === "type" ? (a.type ?? "").localeCompare(b.type ?? "") : 0);
+  // "Recent" means newest first: nodes arrive in creation order.
   if (sort === "recent") items.reverse();
+
+  // A group owns its children, so it is listed once with them nested beneath —
+  // otherwise a grouped board reads as a flat pile with no structure.
+  const childrenOf = new Map<string, typeof items>();
+  const roots: typeof items = [];
+  for (const n of items) {
+    const parent = n.parentNode;
+    if (parent && real.some((r) => r.id === parent)) {
+      const list = childrenOf.get(parent) ?? [];
+      list.push(n);
+      childrenOf.set(parent, list);
+    } else {
+      roots.push(n);
+    }
+  }
   const count = (k: NodeKind[] | null) => (k ? real.filter((n) => k.includes(n.type as NodeKind)).length : real.length);
 
   return (
@@ -60,12 +76,24 @@ function Navigator({ nodes, selectedIds, onFocus }: { nodes: Node<NodeData>[]; s
       </div>
       <div className="panel-body">
         {items.length === 0 && <div className="empty">Nothing here yet.</div>}
-        {items.map((n) => (
-          <button key={n.id} className="nav-item" aria-pressed={selectedIds.has(n.id)} onClick={() => onFocus(n.id)}>
-            <span className={`glyph${n.type === "ai" ? " accent" : ""}`}>{glyph(n.type)}</span>
-            <span className="title">{n.data.object.title || String(n.data.object.content.text ?? "").slice(0, 60) || "Untitled"}</span>
-          </button>
-        ))}
+        {roots.map((n) => {
+          const kids = childrenOf.get(n.id) ?? [];
+          return (
+            <div key={n.id}>
+              <button className="nav-item" aria-pressed={selectedIds.has(n.id)} onClick={() => onFocus(n.id)}>
+                <span className={`glyph${n.type === "ai" ? " accent" : ""}`}>{glyph(n.type)}</span>
+                <span className="title">{n.data.object.title || String(n.data.object.content.text ?? "").slice(0, 60) || "Untitled"}</span>
+                {kids.length > 0 && <span className="nav-count">{kids.length}</span>}
+              </button>
+              {kids.map((k) => (
+                <button key={k.id} className="nav-item nested" aria-pressed={selectedIds.has(k.id)} onClick={() => onFocus(k.id)}>
+                  <span className={`glyph${k.type === "ai" ? " accent" : ""}`}>{glyph(k.type)}</span>
+                  <span className="title">{k.data.object.title || String(k.data.object.content.text ?? "").slice(0, 60) || "Untitled"}</span>
+                </button>
+              ))}
+            </div>
+          );
+        })}
       </div>
       <div className="panel-foot">Click an item to fly to it</div>
     </>

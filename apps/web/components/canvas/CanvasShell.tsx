@@ -405,6 +405,24 @@ export function CanvasShell({ id }: { id: string }) {
     }
   }, [doc, centre, update, fail]);
 
+  const addRandomPaper = useCallback(async () => {
+    if (!doc) return;
+    try {
+      const { results } = await api.random();
+      const paper = results[0];
+      if (!paper) return say("Could not reach OpenAlex just now.");
+      const pos = centre();
+      const { object } = await api.addObject({
+        canvasId: doc.id, objectType: "PAPER", openalexId: paper.openalexId,
+        title: paper.title, content: { openalexId: paper.openalexId }, x: pos.x, y: pos.y,
+      });
+      update((d) => ({ ...d, nodes: [...d.nodes, toNode("paper", object, { paper })] }));
+      say(`Added “${paper.title.slice(0, 50)}”`);
+    } catch (e) {
+      fail("Random paper")(e);
+    }
+  }, [doc, centre, update, say, fail]);
+
   const addWikipedia = useCallback(async () => {
     const q = window.prompt("Wikipedia article or topic");
     if (!q?.trim()) return;
@@ -467,8 +485,12 @@ export function CanvasShell({ id }: { id: string }) {
     try {
       // The server assembles context by PRD §15 priority (selection, then graph
       // neighbours, then canvas), so we send ids rather than pasted text.
-      const { reply } = await api.chat({ canvasId: doc.id, message: text, selectedObjectIds: contextIds });
-      update((d) => ({ ...d, chat: [...d.chat, { id: uid(), role: "assistant", text: reply, contextIds }] }), false);
+      const { reply, contextObjectIds } = await api.chat({ canvasId: doc.id, message: text, selectedObjectIds: contextIds });
+      // Record what the server actually retrieved, not just what was selected:
+      // anything derived from this reply is then placed beside the objects it
+      // came from rather than in the middle of the board.
+      const used = contextObjectIds?.length ? contextObjectIds : contextIds;
+      update((d) => ({ ...d, chat: [...d.chat, { id: uid(), role: "assistant", text: reply, contextIds: used }] }), false);
     } catch (e) {
       fail("Chat")(e);
     } finally {
@@ -668,6 +690,7 @@ export function CanvasShell({ id }: { id: string }) {
                     <div className="popover add-menu" onMouseLeave={() => setAddOpen(false)}>
                       <button className="menu-item" onClick={() => { setAddOpen(false); setPalette({ open: true }); }}><PaperIcon /> Paper</button>
                       <button className="menu-item" onClick={() => { setAddOpen(false); addWikipedia(); }}><WikiIcon /> Wikipedia</button>
+                      <button className="menu-item" onClick={() => { setAddOpen(false); addRandomPaper(); }}><PaperIcon /> Surprise me</button>
                       <button className="menu-item" onClick={() => { setAddOpen(false); fileInput.current?.click(); }}><FileIcon /> File</button>
                       <button className="menu-item" onClick={() => { setAddOpen(false); addEmbed(); }}><EmbedIcon /> Embed link</button>
                       <button className="menu-item" onClick={() => { setAddOpen(false); addNote("", undefined, undefined, "text").catch(fail("Text")); }}><TextIcon /> Text</button>

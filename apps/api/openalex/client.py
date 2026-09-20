@@ -72,15 +72,16 @@ class OpenAlexProvider:
         mode: str = "keyword",
         per_page: int = 10,
         filters: str | None = None,
+        page: int = 1,
     ) -> list[dict[str, Any]]:
         """Keyword search for literal lookup; `mode='semantic'` for meaning-based
         discovery over long text (PRD §12)."""
-        key = f"search:{mode}:{query}:{filters}:{per_page}"
+        key = f"search:{mode}:{query}:{filters}:{per_page}:{page}"
         cached = _get_cached(key)
         if cached is not None:
             return cached
 
-        params: dict[str, Any] = {"per-page": per_page, "select": mapping.LIST_FIELDS}
+        params: dict[str, Any] = {"per-page": per_page, "select": mapping.LIST_FIELDS, "page": page}
         if mode == "semantic":
             # Semantic search takes free text and ranks by meaning.
             params["search.semantic"] = query[:2000]

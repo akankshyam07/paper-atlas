@@ -38,6 +38,8 @@ export const api = {
   citations: (objectId: string, direction: CitationDirection, limit = 25): Promise<SearchResponse> =>
     fetch(`${BASE}/citations?objectId=${encodeURIComponent(objectId)}&direction=${direction}&limit=${limit}`).then((r) => r.json()),
   embed: (req: { canvasId: string; url: string; title?: string; x?: number; y?: number }): Promise<{ object: CanvasObject }> => post("/embed", req),
+  random: (topic?: string): Promise<SearchResponse> =>
+    fetch(`${BASE}/random${topic ? `?topic=${encodeURIComponent(topic)}` : ""}`).then((r) => r.json()),
   concepts: (objectId: string): Promise<{ spans: { term: string; start: number; end: number; title: string; url: string }[] }> =>
     fetch(`${BASE}/concepts?objectId=${encodeURIComponent(objectId)}`).then((r) => r.json()),
   conceptSummary: (title: string): Promise<{ title: string; extract: string; url: string; thumbnail?: string }> =>
