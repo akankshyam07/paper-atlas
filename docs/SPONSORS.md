@@ -1,81 +1,75 @@
 # Sponsor Stack
 
-The product stays sponsor-agnostic at its core. Sponsor technologies plug in
-**behind modular provider interfaces** so they can be demonstrated at HackMIT
-without distorting the research workflow or tightly coupling the product to any
-single vendor. No core workflow — and no UI component — depends directly on a
-sponsor SDK.
+The product stays sponsor-agnostic at its core. Targeted HackMIT sponsors are
+incorporated only where they add real product value, and code integrations sit
+**behind modular provider interfaces** so a sponsor SDK never leaks into core
+workflows or UI. A sponsor SDK appears in exactly one place: its implementation
+under `apps/api/providers/`.
 
-Provider interfaces live in [`apps/api/providers/`](../apps/api/providers). The
-default implementations run the demo with stubs; swap in a sponsor
-implementation by setting the relevant env var and registering it.
+Target sponsors: **OpenAI, Elastic, Dropbox, Deepgram, Token Company, Voloridge,
+Long Lake, Ramp.** (Not pursuing Devin.)
 
-## Interface ↔ sponsor mapping
+Two kinds of fit:
+- **Code seam** — a provider interface with a sponsor implementation.
+- **Challenge alignment** — the sponsor's challenge is answered by product
+  behavior/framing, no interface needed.
 
-| Interface | Default | Sponsor option | Role |
+## Code seams (provider interfaces)
+
+| Interface | Default | Sponsor | Role |
 |---|---|---|---|
-| `LLMProvider` | stub | **OpenAI** | Explanations, summaries, tool calling, Broader/Deeper classification, supporting/contradicting analysis, artifact generation |
+| `LLMProvider` | stub | **OpenAI** | Explain/summarize, tool calling, Broader/Deeper classification, supporting/contradicting analysis, artifact generation |
 | `EmbeddingProvider` | stub | **OpenAI** | Embeddings for user/canvas-local content only (not all of OpenAlex) |
-| `SearchProvider` | stub | **Elastic** | Hybrid keyword+semantic search over canvas objects, excerpts, notes, artifacts, parsed PDFs; metadata filtering; RAG retrieval |
-| `ResearchDataProvider` | OpenAlex | — | Scholarly discovery, citation traversal (OpenAlex only) |
-| `InferenceOptimizationProvider` | passthrough | — | Cost/latency/context optimization seam behind the AI gateway (no HackMIT sponsor offering) |
-| `FileSourceProvider` | stub | **Dropbox** | Import user files (PDFs) from Dropbox into the canvas via the upload pipeline |
+| `SearchProvider` | stub | **Elastic** | Hybrid keyword+semantic search over canvas objects, excerpts, notes, artifacts, parsed PDFs; RAG retrieval |
+| `FileSourceProvider` | stub | **Dropbox** | Import user research PDFs from Dropbox into the canvas via the upload pipeline |
 | `SpeechProvider` | stub | **Deepgram** | Optional voice input to canvas chat and read-aloud of AI summaries |
+| `InferenceOptimizationProvider` | passthrough | **Token Company** | Cache, cheaper-model routing, prompt compression around every LLM call |
 
-## Sponsor notes
+`ResearchDataProvider` -> **OpenAlex** (scholarly source of truth, not a sponsor).
+
+## Challenge alignment (no interface)
+
+| Sponsor | Challenge | How Paper Atlas answers it |
+|---|---|---|
+| **Long Lake** | "Convince a non-believer" — AI materially better than a chatbot | AI understands the research graph, turns explanations into persistent objects, proposes the next direction visually, connects claims to papers/excerpts, reorganizes via user-approved actions |
+| **Voloridge** | "Signal in the Noise" — extract signal from huge, messy datasets | Broader/Deeper + foundational/recent ranking pulls high-signal papers out of OpenAlex's massive, noisy corpus; deterministic feature scoring + LLM rerank + loop suppression. Optional: run heavy embedding/ranking on Voloridge compute |
+| **Ramp** | "Save Time. Save Money." | The whole product saves research time — no lost tabs, faster discovery, AI summaries with provenance instead of re-reading papers |
+
+## Notes
 
 ### OpenAI — primary intelligence layer
-Runs through the application's scoped canvas tools, never with direct DB access.
-Powers the agent, explanations, structured tool calling, and recommendation
-classification/reranking.
+Runs through scoped canvas tools, never direct DB access.
 
 ### Elastic — hybrid retrieval layer
-Indexes only application/user-relevant content and cached metadata. OpenAlex
-remains the external scholarly source of truth; Elastic does not mirror it.
+Indexes only application/user content and cached metadata. OpenAlex stays the
+scholarly source of truth; Elastic does not mirror it. Credit: 30-day Cloud trial.
 
-### Voloridge — compute, not a data provider
-Per the HackMIT credits sheet, Voloridge provides AWS CPU/GPU compute for teams
-on its challenge, not a scholarly-data or analysis API. It does NOT back
-`ResearchDataProvider`; OpenAlex is the sole implementation. Consider Voloridge
-only if we run heavy local processing/ML and want their compute (not needed for
-the MVP). See [SPONSOR_CREDITS.md](./SPONSOR_CREDITS.md).
-
-### Inference optimization — interface only
-`InferenceOptimizationProvider` stays as a passthrough seam behind the AI
-gateway so an optimizer can be added later. Token Company (named in an earlier
-draft) is not a HackMIT 2026 sponsor and has no offering, so there is no sponsor
-implementation. Meta ($50 Llama API) is available as a fallback `LLMProvider`.
-
-### Dropbox — file source (challenge fit)
+### Dropbox — file source (core fit)
 Dropbox's challenge is turning fragmented content into something organized and
-actionable — which is what Paper Atlas does. Concrete integration:
-`FileSourceProvider` lets a user import research PDFs straight from Dropbox;
-they flow through the existing upload/parse pipeline and become UPLOADED_FILE
-source entities on the canvas. Dropbox SDK is isolated in
-`providers/dropbox_files.py`. This is a core-fit product feature, not a
-bolt-on.
+actionable — exactly what Paper Atlas does. `FileSourceProvider` imports research
+PDFs from Dropbox through the existing upload/parse pipeline; they become
+UPLOADED_FILE source entities on the canvas. SDK isolated in
+`providers/dropbox_files.py`.
 
 ### Deepgram — optional voice layer
-Secondary fit. `SpeechProvider` adds voice input to the canvas chat bar
-(speech-to-text) and read-aloud of AI explanations (text-to-speech). Kept off
-the core research path so it never distorts the workflow. $200 credits
-available (see [SPONSOR_CREDITS.md](./SPONSOR_CREDITS.md)).
+Secondary fit. `SpeechProvider` adds voice input to the chat bar (STT) and
+read-aloud of AI explanations (TTS). Off the core research path. $200 credits.
 
-### Devin — development-time agent, NOT a runtime dependency
-Use for parallel implementation of isolated components, generating/testing
-backend APIs, integration tests, scoped bug fixes, deploy/repo maintenance. The
-shipped product must run without Devin.
+### Token Company — LLM cost saving (real, implementable)
+Challenge: save as much as possible on the LLM stack. `InferenceOptimizationProvider`
+is the choke point every LLM call passes through — implement caching,
+cheaper-model routing, prompt compression (their models at thetokencompany.com).
+Measuring tokens saved is the challenge deliverable. Impl in
+`providers/token_company.py`. $500 prize.
 
-### Long Lake — challenge alignment (product behavior, no interface)
-Demonstrate AI that is materially more useful than a chatbot: it understands the
-research graph, turns explanations into persistent objects, visually proposes
-the next research direction, connects claims to papers/excerpts, and reorganizes
-the workspace through user-approved actions. The demo narrative: fragmented
-research across tabs/PDFs/Wikipedia/chatbots becomes one persistent, inspectable
-environment.
+### Voloridge — signal in the noise (+ optional compute)
+Answered by the recommendation/ranking layer, not a code interface. Voloridge
+also offers AWS CPU/GPU compute at their booth; use it only if we run heavy local
+embedding/ranking. Not required for the MVP.
+
+### Ramp / Long Lake — product framing
+No integration; the product already embodies both. Emphasize in the demo.
 
 ## Principle
-
-Sponsor-specific services are replaceable. A sponsor SDK appears in exactly one
-place — its provider implementation under `apps/api/providers/` — and nowhere
-else. This preserves a clean production architecture after the hackathon.
+Sponsor services are replaceable after the hackathon. A sponsor SDK lives in one
+provider implementation and nowhere else.

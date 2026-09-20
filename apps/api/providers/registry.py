@@ -43,7 +43,7 @@ def get_research_data() -> ResearchDataProvider:
 
 @lru_cache
 def get_inference_optimizer() -> InferenceOptimizationProvider:
-    return PassthroughInferenceOptimizer()  # TODO: TokenCompanyOptimizer()
+    return PassthroughInferenceOptimizer()  # TODO: TokenCompanyOptimizer() (LLM cost saving)
 
 
 @lru_cache

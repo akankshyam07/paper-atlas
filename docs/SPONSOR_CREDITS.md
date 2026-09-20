@@ -10,10 +10,11 @@ Concrete redemption info for sponsors relevant to Paper Atlas. Source: HackMIT
 | **OpenAI** | $50 Codex + $50 API per person (up to 320) | OpenAI credit request form | `LLMProvider`, `EmbeddingProvider` |
 | **Elastic** | 30-day Elastic Cloud trial | https://www.elastic.co/cloud/cloud-trial-overview/30-days | `SearchProvider` |
 | **Meta** | $50 Meta (Llama) Model API credits | account at https://dev.meta.ai/ + intake form | alt `LLMProvider` (fallback) |
-| **Cognition / Devin** | $1000 Devin credits per team | Google form (see sheet), then booth | dev-time agent (not runtime) |
-| **Voloridge** | AWS CPU/GPU compute for their challenge | talk to Voloridge booth | compute (see note below) |
+| **Voloridge** | "Signal in the Noise" challenge + AWS CPU/GPU compute | booth | recommendation/ranking alignment; optional compute |
 | **Dropbox** | Challenge track (prizes: AirPods Max, fast-track interview) | build on it; no credit needed | `FileSourceProvider` |
 | **Deepgram** | $200 voice AI credits, no card | https://dpgr.am/hackmit26 | `SpeechProvider` (optional) |
+| **Token Company** | LLM cost-saving challenge, $500 prize (no credits) | compression models at thetokencompany.com | `InferenceOptimizationProvider` |
+| **Ramp** | "Save Time. Save Money." challenge (prizes, no credits) | build on it | product framing |
 
 ## Useful, not core
 
@@ -30,6 +31,8 @@ credits sheet, and have been fixed there:
    analysis endpoint. So it does **not** back `ResearchDataProvider`. OpenAlex
    remains the sole `ResearchDataProvider`. Voloridge is only relevant if we run
    heavy local processing/ML and want their compute; not required for the MVP.
-2. **Token Company is not a HackMIT 2026 sponsor.** No credit or offering exists
-   in the sheet. `InferenceOptimizationProvider` stays in the codebase as a
-   passthrough interface (useful seam), but has no sponsor implementation.
+2. **Token Company has a challenge, not credits.** It is absent from the credits
+   sheet but runs an LLM cost-saving challenge ($500 prize; compression models at
+   thetokencompany.com). `InferenceOptimizationProvider` maps to it directly.
+
+3. **Devin dropped.** Not pursuing it; removed from the target list.
