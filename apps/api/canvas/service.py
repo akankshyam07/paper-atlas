@@ -152,7 +152,7 @@ def ingest_file(
     y: float = 0.0,
     storage_key: str | None = None,
 ) -> CanvasObject:
-    """The one ingestion path for uploads AND Dropbox imports.
+    """The one ingestion path for uploaded files.
 
     Dedupes to a canonical source entity, then places a PDF object. Text
     extraction and DOI matching against OpenAlex are a follow-up; this

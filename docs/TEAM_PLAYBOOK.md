@@ -86,8 +86,7 @@ paper-atlas/
 │       │   ├── routes.py       # GET /search, POST /recommend, /explain
 │       │   ├── recommend.py    # Broader vs Deeper scorer (distinct logic)
 │       │   └── explain.py      # AI explain endpoint
-│       ├── providers/         # sponsor seams: OpenAI/Elastic/Dropbox/Deepgram/Token Co
-│       ├── integrations/      # Dropbox import routes (FileSourceProvider)
+│       ├── providers/         # sponsor seams: OpenAI/Elastic/Deepgram/Token Co
 │       ├── speech/            # optional voice routes (SpeechProvider)
 │       └── requirements.txt
 └── .gitignore
@@ -105,7 +104,7 @@ editing.
 |---|---|---|---|---|
 | FE #1 + FE #2 | Frontend (co-owned, not subdivided) | `frontend` | `apps/web/**` | Canvas, node cards, right-click menu, suggestion nodes + ✓/×, chat bar |
 | BE #1 | Backend — data | `backend-data` | `apps/api/canvas/**`, `apps/api/db/**`, `apps/api/models/**` | Schema + migrations, canvas/object/edge CRUD, provenance, dedup |
-| BE #2 | Backend — intelligence | `backend-ai` | `apps/api/intel/**`, `apps/api/openalex/**`, `apps/api/providers/**`, `apps/api/integrations/**`, `apps/api/speech/**` | OpenAlex client + cache, Broader/Deeper scorer, AI explain, sponsor providers, Dropbox import, voice |
+| BE #2 | Backend — intelligence | `backend-ai` | `apps/api/intel/**`, `apps/api/openalex/**`, `apps/api/providers/**`, `apps/api/speech/**` | OpenAlex client + cache, Broader/Deeper scorer, AI explain, sponsor providers, voice |
 
 The two frontend people share one branch and co-own the whole UI — no internal
 task split. They pull before every push and commit in small pieces to stay in

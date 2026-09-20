@@ -2,8 +2,7 @@
 // Empty canvas / onboarding (wireframe 2n).
 import { useState } from "react";
 
-// Dropbox import stays available from the toolbar; keeping it out of the empty
-// state keeps the first screen to the two actions that start a rabbit hole.
+// The first screen stays at the two actions that start a rabbit hole.
 export function EmptyState({ onSearch, onUpload, onDrop }: { onSearch: () => void; onUpload: () => void; onDrop: (files: FileList) => void }) {
   const [over, setOver] = useState(false);
   return (

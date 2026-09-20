@@ -12,12 +12,12 @@ from functools import lru_cache
 
 from providers.base import (
     LLMProvider, EmbeddingProvider, SearchProvider,
-    ResearchDataProvider, InferenceOptimizationProvider, FileSourceProvider,
+    ResearchDataProvider, InferenceOptimizationProvider,
     SpeechProvider,
 )
 from providers.stubs import (
     StubLLM, StubEmbedding, StubSearch, PassthroughInferenceOptimizer,
-    StubFileSource, StubSpeech,
+    StubSpeech,
 )
 
 
@@ -71,17 +71,6 @@ def get_inference_optimizer() -> InferenceOptimizationProvider:
         except Exception:
             pass
     return PassthroughInferenceOptimizer()
-
-
-@lru_cache
-def get_file_source() -> FileSourceProvider:
-    if os.getenv("DROPBOX_TOKEN") or os.getenv("DROPBOX_REFRESH_TOKEN"):
-        try:
-            from providers.dropbox_files import DropboxFileSource
-            return DropboxFileSource()
-        except Exception:
-            pass
-    return StubFileSource()
 
 
 @lru_cache

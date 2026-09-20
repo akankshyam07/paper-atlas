@@ -6,7 +6,7 @@ incorporated only where they add real product value, and code integrations sit
 workflows or UI. A sponsor SDK appears in exactly one place: its implementation
 under `apps/api/providers/`.
 
-Target sponsors: **OpenAI, Elastic, Dropbox, Deepgram, Token Company, Voloridge,
+Target sponsors: **OpenAI, Elastic, Deepgram, Token Company, Voloridge,
 Long Lake, Ramp.** (Not pursuing Devin.)
 
 Two kinds of fit:
@@ -16,7 +16,7 @@ Two kinds of fit:
 
 ## Code seams (provider interfaces)
 
-All six are implemented. Each activates automatically when its credential is
+All five are implemented. Each activates automatically when its credential is
 present and falls back to a stub otherwise, so the app runs with no keys at all.
 
 | Interface | Sponsor impl | Activates when | Role |
@@ -24,7 +24,6 @@ present and falls back to a stub otherwise, so the app runs with no keys at all.
 | `LLMProvider` | **OpenAI** (`openai_llm.py`) | `OPENAI_API_KEY` | Explain/summarize, tool calling, Broader/Deeper classification, supporting/contradicting analysis, artifact generation |
 | `EmbeddingProvider` | **OpenAI** (`openai_llm.py`) | `OPENAI_API_KEY` | Embeddings for user/canvas-local content only (not all of OpenAlex) |
 | `SearchProvider` | **Elastic** (`elastic_search.py`) | `ELASTIC_URL` | Hybrid keyword+semantic search over canvas objects, excerpts, notes, artifacts, parsed PDFs; RAG retrieval |
-| `FileSourceProvider` | **Dropbox** (`dropbox_files.py`) | `DROPBOX_TOKEN` | Import user research PDFs from Dropbox into the canvas via the upload pipeline |
 | `SpeechProvider` | **Deepgram** (`deepgram_speech.py`) | `DEEPGRAM_API_KEY` | Optional voice input to canvas chat and read-aloud of AI summaries |
 | `InferenceOptimizationProvider` | **Token Company** (`token_company.py`) | always on (no key needed) | Cache, cheaper-model routing, prompt compression around every LLM call |
 
@@ -47,13 +46,6 @@ Runs through scoped canvas tools, never direct DB access.
 Indexes only application/user content and cached metadata. OpenAlex stays the
 scholarly source of truth; Elastic does not mirror it. Credit: 30-day Cloud trial.
 
-### Dropbox — file source (core fit)
-Dropbox's challenge is turning fragmented content into something organized and
-actionable — exactly what Paper Atlas does. `FileSourceProvider` imports research
-PDFs from Dropbox through the existing upload/parse pipeline; they become
-UPLOADED_FILE source entities on the canvas. SDK isolated in
-`providers/dropbox_files.py`.
-
 ### Deepgram — optional voice layer
 Secondary fit. `SpeechProvider` adds voice input to the chat bar (STT) and
 read-aloud of AI explanations (TTS). Off the core research path. $200 credits.
@@ -73,10 +65,9 @@ tokens saved across repeated explains of the same paper. $500 prize.
 BM25 and kNN together, so exact terms and meaning both retrieve. Embeddings come
 from `EmbeddingProvider`, so Elastic never talks to a model vendor directly.
 
-### Dropbox / Deepgram (implemented)
-`dropbox_files.py` lists and downloads research files (token or refresh-token
-auth) into the normal upload pipeline. `deepgram_speech.py` does speech-to-text
-for chat input and text-to-speech for read-aloud.
+### Deepgram (implemented)
+`deepgram_speech.py` does speech-to-text for chat input and text-to-speech for
+read-aloud.
 
 ### Voloridge — signal in the noise (dataset = OpenAlex)
 The dataset is OpenAlex itself: a huge, noisy scholarly corpus. Our

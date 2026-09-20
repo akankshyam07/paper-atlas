@@ -11,7 +11,6 @@ Concrete redemption info for sponsors relevant to Paper Atlas. Source: HackMIT
 | **Elastic** | 30-day Elastic Cloud trial | https://www.elastic.co/cloud/cloud-trial-overview/30-days | `SearchProvider` |
 | **Meta** | $50 Meta (Llama) Model API credits | account at https://dev.meta.ai/ + intake form | alt `LLMProvider` (fallback) |
 | **Voloridge** | "Signal in the Noise" challenge; dataset is OpenAlex | booth | recommendation/ranking over OpenAlex |
-| **Dropbox** | Challenge track (prizes: AirPods Max, fast-track interview) | build on it; no credit needed | `FileSourceProvider` |
 | **Deepgram** | $200 voice AI credits, no card | https://dpgr.am/hackmit26 | `SpeechProvider` (optional) |
 | **Token Company** | LLM cost-saving challenge, $500 prize (no credits) | compression models at thetokencompany.com | `InferenceOptimizationProvider` |
 | **Ramp** | "Save Time. Save Money." challenge (prizes, no credits) | build on it | product framing |

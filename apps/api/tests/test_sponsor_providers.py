@@ -5,7 +5,7 @@ strategies need no key — and measured savings is the challenge deliverable.
 """
 from providers.base import (
     LLMProvider, EmbeddingProvider, SearchProvider, ResearchDataProvider,
-    InferenceOptimizationProvider, FileSourceProvider, SpeechProvider,
+    InferenceOptimizationProvider, SpeechProvider,
 )
 from providers import registry
 from providers.token_company import TokenCompanyOptimizer
@@ -17,7 +17,6 @@ def test_defaults_satisfy_interfaces():
     assert isinstance(registry.get_search(), SearchProvider)
     assert isinstance(registry.get_research_data(), ResearchDataProvider)
     assert isinstance(registry.get_inference_optimizer(), InferenceOptimizationProvider)
-    assert isinstance(registry.get_file_source(), FileSourceProvider)
     assert isinstance(registry.get_speech(), SpeechProvider)
 
 

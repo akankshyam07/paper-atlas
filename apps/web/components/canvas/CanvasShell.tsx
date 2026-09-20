@@ -25,7 +25,6 @@ import { CommandPalette, type PaletteAction } from "../search/CommandPalette";
 import { SidePanel, type PanelTab } from "../panel/SidePanel";
 import { Viewer, type Selection, type SelectionAction } from "../panel/Viewer";
 import { ChatPanel } from "../panel/ChatPanel";
-import { DropboxImport } from "../integrations/DropboxImport";
 
 const nodeTypes = { paper: PaperNode, suggestion: SuggestionNode, ai: AiNoteNode, note: NoteNode, excerpt: ExcerptNode, thread: ThreadNode, pdf: PdfNode, group: GroupNode };
 
@@ -42,7 +41,7 @@ function toNode(kind: NodeKind, object: CanvasObject, extra: Partial<NodeData> =
 function toEdge(id: string, source: string, target: string, edgeType: EdgeData["edgeType"], provenance: EdgeData["provenance"], ghost = false): Edge<EdgeData> {
   return { id, source, target, data: { edgeType, provenance }, className: ghost ? "ghost" : undefined, markerEnd: { type: MarkerType.Arrow, width: 16, height: 16, color: ghost ? "#9ec8f5" : "#c7c7cc" } };
 }
-const kindOf = (o: CanvasObject): NodeKind => (o.objectType === "AI_SUMMARY" ? "ai" : o.content.origin === "dropbox" || o.content.filename ? "pdf" : (o.objectType.toLowerCase() as NodeKind));
+const kindOf = (o: CanvasObject): NodeKind => (o.objectType === "AI_SUMMARY" ? "ai" : o.content.filename ? "pdf" : (o.objectType.toLowerCase() as NodeKind));
 
 export function CanvasShell({ id }: { id: string }) {
   const { doc, saved, update, undo, redo } = useCanvasDoc(id);
@@ -53,7 +52,6 @@ export function CanvasShell({ id }: { id: string }) {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [palette, setPalette] = useState<{ open: boolean; query?: string }>({ open: false });
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [dropbox, setDropbox] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
@@ -464,7 +462,6 @@ export function CanvasShell({ id }: { id: string }) {
 
   const paletteActions = useMemo<PaletteAction[]>(() => [
     { id: "upload", label: "Upload PDF", run: () => fileInput.current?.click() },
-    { id: "dropbox", label: "Import from Dropbox", run: () => setDropbox(true) },
     { id: "note", label: "New note", run: () => addNote().catch(fail("Note")) },
     { id: "fit", label: "Fit canvas", run: () => flow.fitView({ padding: 0.2, duration: 300 }) },
   ], [addNote, fail, flow]);
@@ -573,7 +570,6 @@ export function CanvasShell({ id }: { id: string }) {
           initialQuery={palette.query}
         />
       )}
-      {dropbox && <DropboxImport canvasId={doc.id} at={centre()} onImported={(o) => addLocal(kindOf(o), o)} onClose={() => setDropbox(false)} />}
       {toast && <div className="toast" role="status">{toast}</div>}
     </BoardActionsContext.Provider>
   );

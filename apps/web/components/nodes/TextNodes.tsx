@@ -1,6 +1,6 @@
 "use client";
 // Note (editable), Excerpt (quoted, keeps page + source), Thread (chat as a
-// node), PDF (upload/Dropbox card) and Group (frame) nodes.
+// node), PDF (upload card) and Group (frame) nodes.
 import { memo } from "react";
 import { Handle, NodeResizer, Position, type NodeProps } from "reactflow";
 import type { NodeData } from "../../lib/store";
@@ -70,7 +70,7 @@ export const PdfNode = memo(function PdfNode({ id, data }: NodeProps<NodeData>) 
   return (
     <div className="node pdf">
       <QuickActions id={id} />
-      <div className="eyebrow">PDF{c.origin === "dropbox" ? " · Dropbox" : ""}</div>
+      <div className="eyebrow">PDF</div>
       <div className="node-title">{data.object.title ?? c.filename}</div>
       <div className="pdf-preview">{c.pageCount ? `page 1 of ${c.pageCount}` : "Open to read"}</div>
       <Handles />

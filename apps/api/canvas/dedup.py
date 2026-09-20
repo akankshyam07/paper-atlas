@@ -1,6 +1,6 @@
 """Source-entity deduplication (PRD §23). One canonical entity per real source.
 
-A paper uploaded, fetched, or imported from Dropbox must resolve to the SAME
+A paper uploaded or fetched must resolve to the SAME
 source_entity so scholarly metadata is never duplicated across canvases.
 """
 from __future__ import annotations

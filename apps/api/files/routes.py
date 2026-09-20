@@ -1,7 +1,7 @@
 """Upload and serve files (PRD §10/§22).
 
 Uploads are validated for size and type, stored content-addressed, and placed on
-the canvas through the same ingest path as a Dropbox import.
+the canvas through service.ingest_file.
 """
 import uuid
 

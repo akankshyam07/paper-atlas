@@ -12,7 +12,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from canvas.routes import router as canvas_router
 from files.routes import router as files_router
 from intel.routes import router as intel_router
-from integrations.routes import router as dropbox_router
 from speech.routes import router as speech_router
 
 app = FastAPI(title="Paper Atlas API")
@@ -37,7 +36,6 @@ app.add_middleware(
 app.include_router(canvas_router)
 app.include_router(files_router)
 app.include_router(intel_router)
-app.include_router(dropbox_router)
 app.include_router(speech_router)
 
 

@@ -97,27 +97,6 @@ class ExplainResponse(BaseModel):
 
 
 # ---- Sponsor-feature schemas ----
-class DropboxFile(BaseModel):
-    id: str
-    name: str
-    path: str
-
-
-class DropboxListResponse(BaseModel):
-    files: list[DropboxFile]
-
-
-class DropboxImportRequest(BaseModel):
-    canvasId: str
-    fileId: str
-    x: float
-    y: float
-
-
-class DropboxImportResponse(BaseModel):
-    object: CanvasObject
-
-
 class TranscribeResponse(BaseModel):
     text: str
 

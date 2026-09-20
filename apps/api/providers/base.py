@@ -41,13 +41,6 @@ class InferenceOptimizationProvider(Protocol):
 
 
 @runtime_checkable
-class FileSourceProvider(Protocol):
-    # Dropbox (challenge). Pull user files into the canvas; SDK isolated here.
-    def list_files(self, path: str = "") -> list[dict[str, Any]]: ...
-    def download(self, file_id: str) -> bytes: ...
-
-
-@runtime_checkable
 class SpeechProvider(Protocol):
     # Deepgram (challenge). Voice input to chat + read-aloud; SDK isolated here.
     def transcribe(self, audio: bytes, *, mime: str = "audio/wav") -> str: ...

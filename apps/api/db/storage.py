@@ -1,4 +1,4 @@
-"""File storage for uploads and Dropbox imports.
+"""File storage for uploads.
 
 Supabase Storage when configured; otherwise a local directory, so uploads work
 with no credentials. Same interface either way — callers never branch on it.

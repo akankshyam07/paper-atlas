@@ -12,7 +12,7 @@ blocks the demo. Status as of the current `main`.
   3 preview nodes, accept/reject, "Show 3 more", auto-fit to new suggestions
 - Explain → AI artifact node with provenance, linked by an `EXPLAINS` edge
 - Postgres/Supabase persistence: canvases, objects, edges, source-entity dedup
-- Sponsor providers implemented: OpenAI, Elastic, Dropbox, Deepgram, Token Company
+- Sponsor providers implemented: OpenAI, Elastic, Deepgram, Token Company
   (each auto-activates on its credential, falls back to a stub)
 - Token Company savings measured and exposed at `GET /inference/stats` (66.7% on
   repeated explains)
@@ -46,9 +46,7 @@ All fixed. CI is green.
    (out / in / related). The Viewer tabs load them on demand, and the three menu
    actions now produce the same translucent preview nodes as Broader/Deeper —
    references upstream, citing and related work downstream.
-7. ~~Dropbox import returns a stub.~~ Now routes through `service.ingest_file()`,
-   so an imported file is a persisted PDF object deduped to a canonical source
-   entity — the same path a manual upload takes.
+7. ~~Dropbox import returns a stub.~~ Dropbox integration removed entirely.
 8. **No upload endpoint.** Uploaded PDF bytes live in a browser `Map` for the
    session only (`CanvasShell.tsx:32`), so PDFs vanish on reload. Needs
    `POST /files` + Supabase Storage (`db/storage.py` is still a stub).
@@ -114,5 +112,4 @@ Fix **1–3** (small, and CI is red). Then **4–7**, which is what makes the de
 look real: abstracts on papers unlock the Viewer, text selection, and excerpts,
 and citations turn three dead menu items live. **8–9** (upload + PDF.js) unlock
 the whole PDF half of the product. Everything in P2 is a genuine feature build;
-pick by what the demo narrative needs — for the Dropbox and Long Lake challenges
-that is #7 and #13 respectively.
+pick by what the demo narrative needs — for the Long Lake challenge that is #13.
