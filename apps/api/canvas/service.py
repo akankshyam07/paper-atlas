@@ -11,6 +11,21 @@ from sqlalchemy.orm import Session
 from models.entities import Canvas, CanvasObject, ObjectEdge
 
 
+def ensure_canvas(db: Session, canvas_id: uuid.UUID, *, title: str = "Untitled canvas") -> Canvas:
+    """Get-or-create a canvas by client-supplied id.
+
+    The frontend mints canvas ids locally (localStorage-first board state), so an
+    object or edge can arrive before the canvas row exists. Both mutation paths
+    route through here, so the row is created once, at the choke point.
+    """
+    canvas = db.get(Canvas, canvas_id)
+    if canvas is None:
+        canvas = Canvas(id=canvas_id, title=title)
+        db.add(canvas)
+        db.flush()
+    return canvas
+
+
 def create_canvas(db: Session, *, title: str, user_id: uuid.UUID | None = None) -> Canvas:
     canvas = Canvas(title=title, user_id=user_id)
     db.add(canvas)
@@ -31,6 +46,7 @@ def create_object(
     y: float = 0.0,
     created_by: str = "USER",
 ) -> CanvasObject:
+    ensure_canvas(db, canvas_id)
     obj = CanvasObject(
         canvas_id=canvas_id,
         object_type=object_type,
@@ -56,6 +72,7 @@ def create_edge(
     edge_type: str,
     provenance: str = "USER",
 ) -> ObjectEdge:
+    ensure_canvas(db, canvas_id)
     # Guard: both endpoints must exist on this canvas (edge belongs to a canvas).
     objs = db.execute(
         select(CanvasObject.id).where(

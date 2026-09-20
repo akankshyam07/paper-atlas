@@ -62,3 +62,18 @@ def test_ingest_file_dedups_and_places():
         assert obj.source_entity_id is not None
     finally:
         db.close()
+
+
+def test_object_autocreates_canvas_from_client_id():
+    # Frontend mints canvas ids locally; the first object must not 500 on a
+    # missing canvases row (FK violation).
+    db = SessionLocal()
+    try:
+        cid = uuid.uuid4()
+        obj = service.create_object(db, canvas_id=cid, object_type="PAPER", title="P")
+        assert obj.canvas_id == cid
+        # second object reuses the same auto-created canvas
+        obj2 = service.create_object(db, canvas_id=cid, object_type="NOTE", title="N")
+        assert obj2.canvas_id == cid
+    finally:
+        db.close()
