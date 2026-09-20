@@ -347,11 +347,21 @@ export function CanvasShell({ id }: { id: string }) {
     try {
       const { object } = await api.addObject({ canvasId: doc.id, objectType: "PAPER", openalexId: s.paper.openalexId, title: s.paper.title, content: { openalexId: s.paper.openalexId, recommendedBy: s.anchorId, mode: s.mode, reason: s.reason }, x: g.position.x, y: g.position.y });
       const [src, tgt] = s.mode === "broader" ? [object.id, s.anchorId] : [s.anchorId, object.id];
-      const { edge } = await api.addEdge({ canvasId: doc.id, sourceObjectId: src, targetObjectId: tgt, edgeType: "RELATED_TO" });
+      // The paper is the point of accepting; the edge only records why it is
+      // here. If the anchor is not a row the server knows about — a board
+      // carried over from an earlier database, say — /edges rejects the pair,
+      // and refusing the whole accept over that loses the paper the user asked
+      // for. Draw the edge locally instead and keep going.
+      let edgeId = `local-${uid()}`;
+      try {
+        edgeId = (await api.addEdge({ canvasId: doc.id, sourceObjectId: src, targetObjectId: tgt, edgeType: "RELATED_TO" })).edge.id;
+      } catch {
+        /* keep the local edge */
+      }
       update((d) => ({
         ...d,
         nodes: [...d.nodes.filter((n) => n.id !== nid), toNode("paper", object, { paper: s.paper })],
-        edges: [...d.edges.filter((e) => e.source !== nid && e.target !== nid), { ...toEdge(edge.id, src, tgt, "RELATED_TO", "AI"), label: s.relationshipLabel, labelStyle: { fontSize: 10, fill: "var(--ink-4)" }, labelBgStyle: { fill: "var(--board)" } }],
+        edges: [...d.edges.filter((e) => e.source !== nid && e.target !== nid), { ...toEdge(edgeId, src, tgt, "RELATED_TO", "AI"), label: s.relationshipLabel, labelStyle: { fontSize: 10, fill: "var(--ink-4)" }, labelBgStyle: { fill: "var(--board)" } }],
       }));
     } catch (e) {
       fail("Accept")(e);
