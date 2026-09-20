@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from canvas import service
@@ -22,6 +23,7 @@ from openalex import mapping
 from providers.registry import get_research_data
 from schemas import (
     StanceRequest, ChatRequest, ChatResponse,
+    ThreadRequest, ThreadResponse, ThreadMessages, Message,
     SearchResponse, PaperPreview,
     RecommendRequest, RecommendResponse, Recommendation,
     ExplainRequest, ExplainResponse, CanvasObject, ObjectEdge,
@@ -188,6 +190,57 @@ def random_work(topic: str | None = None, seed: int | None = None) -> SearchResp
     return SearchResponse(results=[])
 
 
+@router.post("/threads", response_model=ThreadResponse)
+def create_thread(req: ThreadRequest, db: Session = Depends(get_db)) -> ThreadResponse:
+    """Start a thread anchored on a node (PRD §17). The thread becomes its own
+    object on the board and the source node is its initial pinned context."""
+    from models.entities import ChatThread
+
+    canvas_id = _as_uuid(req.canvasId)
+    anchor = _as_uuid(req.objectId)
+    src = service.get_object(db, anchor) if anchor else None
+    title = req.title or (f"About: {src.title}" if src and src.title else "Thread")
+
+    node = service.create_object(
+        db, canvas_id=canvas_id, object_type="THREAD", title=title[:200],
+        content={"anchorObjectId": req.objectId, "messageCount": 0}, x=req.x, y=req.y,
+    )
+    thread = ChatThread(canvas_id=canvas_id, canvas_object_id=node.id, title=title[:200])
+    db.add(thread)
+    db.commit()
+    db.refresh(thread)
+
+    if anchor:
+        try:
+            service.create_edge(db, canvas_id=canvas_id, source_object_id=anchor,
+                                target_object_id=node.id, edge_type="THREAD_CONTEXT")
+        except ValueError:
+            pass
+
+    return ThreadResponse(
+        threadId=str(thread.id),
+        object=CanvasObject(
+            id=str(node.id), canvasId=str(node.canvas_id), objectType=node.object_type,
+            sourceEntityId=None, title=node.title, content=node.content,
+            x=node.x, y=node.y, createdBy=node.created_by,
+        ),
+    )
+
+
+@router.get("/threads/{thread_id}", response_model=ThreadMessages)
+def get_thread(thread_id: str, db: Session = Depends(get_db)) -> ThreadMessages:
+    from models.entities import ChatMessage
+
+    rows = db.execute(
+        select(ChatMessage).where(ChatMessage.thread_id == uuid.UUID(thread_id))
+        .order_by(ChatMessage.created_at)
+    ).scalars().all()
+    return ThreadMessages(messages=[Message(
+        id=str(m.id), role=m.role, content=m.content,
+        contextSnapshot=m.context_snapshot or {},
+    ) for m in rows])
+
+
 @router.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     """Canvas chat. Context follows the PRD §15 retrieval priority: the user's
@@ -216,8 +269,20 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
         if u:
             for n in service.get_neighbors(db, u, depth=1)[:4]:
                 add(n, "linked")
-    # 3. the rest of the canvas, only to fill remaining budget
+    # 3. semantic retrieval over canvas-local chunks, before falling back to
+    #    simply listing objects (PRD §15 retrieval order)
     if canvas_uuid and len(parts) < 4:
+        try:
+            from retrieval.service import search as retrieve
+            for hit in retrieve(db, canvas_uuid, req.message, limit=4):
+                key = f"chunk:{hit['id']}"
+                if key in seen:
+                    continue
+                seen.add(key)
+                parts.append(f"[retrieved] {hit.get('section_title') or ''}\n{hit['text'][:900]}".strip())
+        except Exception:
+            pass
+    if canvas_uuid and len(parts) < 3:
         for o in service.list_objects(db, canvas_uuid, limit=6):
             add(o, "canvas")
 
@@ -228,7 +293,21 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
         system=("You answer questions about the user's research canvas. Ground every "
                 "claim in the provided context. If the context does not answer it, say so."),
     )
-    return ChatResponse(reply=answer, contextObjectIds=list(seen))
+    # A thread keeps its turns, and each turn keeps the context that produced
+    # it, so an old answer stays reproducible after the graph changes (PRD §17).
+    if req.threadId:
+        from models.entities import ChatMessage
+
+        tid = _as_uuid(req.threadId)
+        if tid:
+            snapshot = {"objectIds": [s for s in seen if not s.startswith("chunk:")]}
+            db.add(ChatMessage(thread_id=tid, role="user", content=req.message,
+                               context_snapshot=snapshot))
+            db.add(ChatMessage(thread_id=tid, role="assistant", content=answer,
+                               context_snapshot=snapshot))
+            db.commit()
+
+    return ChatResponse(reply=answer, contextObjectIds=[s for s in seen if not s.startswith("chunk:")])
 
 
 @router.post("/explain", response_model=ExplainResponse)

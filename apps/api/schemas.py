@@ -120,6 +120,7 @@ class ChatRequest(BaseModel):
     canvasId: str
     message: str
     selectedObjectIds: list[str] = []
+    threadId: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -156,3 +157,58 @@ class WikiSummary(BaseModel):
     extract: str
     url: str
     thumbnail: str | None = None
+
+
+class ProposeRequest(BaseModel):
+    canvasId: str
+    proposalType: str
+    payload: dict[str, Any] = {}
+    reason: str | None = None
+
+
+class Proposal(BaseModel):
+    id: str
+    canvasId: str
+    proposalType: str
+    payload: dict[str, Any]
+    reason: str | None
+    status: str
+
+
+class ProposalList(BaseModel):
+    proposals: list[Proposal]
+
+
+class ResolveResponse(BaseModel):
+    id: str
+    status: str
+    createdIds: list[str]
+
+
+class OrganizeRequest(BaseModel):
+    canvasId: str
+    instruction: str | None = None
+
+
+class ThreadRequest(BaseModel):
+    canvasId: str
+    objectId: str | None = None
+    title: str | None = None
+    x: float = 0.0
+    y: float = 0.0
+
+
+class ThreadResponse(BaseModel):
+    threadId: str
+    object: CanvasObject
+
+
+class Message(BaseModel):
+    id: str
+    role: str
+    content: str
+    contextSnapshot: dict[str, Any]
+
+
+class ThreadMessages(BaseModel):
+    messages: list[Message]

@@ -61,7 +61,18 @@ def create_object(
     db.commit()
     db.refresh(obj)
     _index(obj)
+    _embed(db, obj)
     return obj
+
+
+def _embed(db: Session, obj: CanvasObject) -> None:
+    """Chunk and embed the object for canvas-local retrieval (PRD §15).
+    Best-effort: retrieval being unavailable must not fail a board mutation."""
+    try:
+        from retrieval.service import index_object
+        index_object(db, obj)
+    except Exception:
+        db.rollback()
 
 
 def _index(obj: CanvasObject) -> None:

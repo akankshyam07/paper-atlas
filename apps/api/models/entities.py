@@ -14,6 +14,7 @@ from sqlalchemy import (
     String, Float, Integer, DateTime, ForeignKey, Text, func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -140,7 +141,8 @@ class Chunk(Base):
     text: Mapped[str] = mapped_column(Text, nullable=False)
     section_title: Mapped[str | None] = mapped_column(String, nullable=True)
     page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # embedding VECTOR(1536) added by migration 0002 (needs pgvector extension)
+    # 1536 matches text-embedding-3-small; declared here so migrations see it.
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -157,3 +159,48 @@ class Suppression(Base):
     mode: Mapped[str] = mapped_column(String, nullable=False)
     openalex_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ChatThread(Base):
+    """A conversation anchored on the canvas (PRD §17). Threads are independent;
+    nothing is shared between them implicitly."""
+    __tablename__ = "chat_threads"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    canvas_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("canvases.id", ondelete="CASCADE"), nullable=False, index=True)
+    canvas_object_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("canvas_objects.id", ondelete="CASCADE"), nullable=True)
+    title: Mapped[str] = mapped_column(String, default="Thread")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class ChatMessage(Base):
+    """One turn. context_snapshot is immutable: a later answer must stay
+    reproducible even after the graph changes (PRD §17)."""
+    __tablename__ = "chat_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    thread_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("chat_threads.id", ondelete="CASCADE"), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String, nullable=False)  # user | assistant
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    context_snapshot: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AIProposal(Base):
+    """A pending change the agent wants to make (PRD §16).
+
+    The agent never mutates the board directly: it writes a proposal, the user
+    sees the diff and accepts or rejects it.
+    """
+    __tablename__ = "ai_proposals"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    canvas_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("canvases.id", ondelete="CASCADE"), nullable=False, index=True)
+    thread_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    proposal_type: Mapped[str] = mapped_column(String, nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, default=dict)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String, default="PENDING")  # PENDING|ACCEPTED|REJECTED
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
