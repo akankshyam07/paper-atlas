@@ -80,9 +80,12 @@ export function PdfPage({ url, page, onPages, onFail, className }: {
         setState("ok");
       } catch (err) {
         if (cancelled) return; // cancelling a render rejects; that is not a failure
-        // Surface the reason: a silent "unavailable" hides worker and CORS
-        // problems that look identical to a dead link.
-        console.error("PdfPage failed", { url, page, err });
+        // A warning, not an error: a dead OA link is an ordinary outcome and the
+        // node falls back to its abstract. console.error would raise Next's
+        // full-screen dev overlay over a page that is working as intended.
+        // The reason is still named — worker and CORS failures look identical
+        // to a dead link without it.
+        console.warn(`PdfPage: ${url} page ${page} — ${(err as Error)?.message ?? err}`);
         setState("error");
         onFail?.();
       }
