@@ -6,8 +6,9 @@ branch (backend-data: canvas/, backend-ai: intel/).
 """
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from canvas.routes import router as canvas_router
 from agent.routes import router as agent_router
@@ -16,6 +17,7 @@ from embeds.routes import router as embeds_router
 from files.routes import router as files_router
 from intel.routes import router as intel_router
 from speech.routes import router as speech_router
+from openalex.client import OpenAlexUnavailable
 
 app = FastAPI(title="Paper Atlas API")
 
@@ -43,6 +45,14 @@ app.include_router(concepts_router)
 app.include_router(agent_router)
 app.include_router(intel_router)
 app.include_router(speech_router)
+
+
+@app.exception_handler(OpenAlexUnavailable)
+def openalex_unavailable(request: Request, exc: OpenAlexUnavailable) -> JSONResponse:
+    """503 with the reason, rather than an empty result set. An empty list here
+    reads as "nothing matched", which is how a spent request budget went
+    undiagnosed as a broken recommender."""
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
 @app.get("/health")

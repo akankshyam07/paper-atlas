@@ -14,19 +14,35 @@ import type {
 
 const BASE = "/api"; // rewritten to the FastAPI server in next.config.mjs
 
+/** The server explains its refusals in `detail`. Showing only the status code
+ *  turned "OpenAlex is out of request budget" into "failed: 503", which reads
+ *  as a bug in this app rather than something the user can act on. */
+async function fail(path: string, res: Response): Promise<never> {
+  let detail = "";
+  try {
+    detail = ((await res.json()) as { detail?: string }).detail ?? "";
+  } catch {
+    /* not JSON */
+  }
+  throw new Error(detail || `${path} failed: ${res.status}`);
+}
+
 async function post<TReq, TRes>(path: string, body: TReq): Promise<TRes> {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
+  if (!res.ok) return fail(path, res);
   return res.json();
 }
 
 export const api = {
-  search: (q: string, limit = 10): Promise<SearchResponse> =>
-    fetch(`${BASE}/search?q=${encodeURIComponent(q)}&limit=${limit}`).then((r) => r.json()),
+  search: async (q: string, limit = 10): Promise<SearchResponse> => {
+    const res = await fetch(`${BASE}/search?q=${encodeURIComponent(q)}&limit=${limit}`);
+    if (!res.ok) return fail("/search", res);
+    return res.json();
+  },
   addObject: (req: AddObjectRequest): Promise<AddObjectResponse> =>
     post("/objects", req),
   addEdge: (req: AddEdgeRequest): Promise<AddEdgeResponse> =>

@@ -6,8 +6,10 @@ Rules honoured here:
 - cache only works the user touches; short TTL for searches
 - never mirror the full corpus
 
-No API key needed. `OPENALEX_MAILTO` opts into the polite pool (faster, kinder);
-it is configuration, not user data.
+`OPENALEX_API_KEY` is free and gives this app its own request budget. Without
+one, requests count against a daily budget shared by every machine on the same
+IP address, which a demo exhausts quickly; `OPENALEX_MAILTO` no longer exempts
+them from it. Both are configuration, not user data.
 """
 from __future__ import annotations
 
@@ -21,6 +23,16 @@ from openalex import mapping
 
 BASE = "https://api.openalex.org"
 MAILTO = os.getenv("OPENALEX_MAILTO") or None
+API_KEY = os.getenv("OPENALEX_API_KEY") or None
+
+
+class OpenAlexUnavailable(RuntimeError):
+    """OpenAlex refused the request — out of budget, or down.
+
+    Deliberately NOT an httpx.HTTPError. Every call below turns HTTPError into
+    an empty list, which made a spent daily budget look exactly like "no results
+    for that paper" and sent us hunting for bugs in the recommender instead.
+    """
 
 # TTLs per PRD §12. Work metadata is near-immutable; searches are volatile.
 WORK_TTL = 7 * 24 * 3600
@@ -54,8 +66,15 @@ def _params(extra: dict[str, Any]) -> dict[str, Any]:
 
 
 def _request(path: str, params: dict[str, Any], *, timeout: float = 12.0) -> dict[str, Any]:
-    with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+    headers = {"Authorization": f"Bearer {API_KEY}"} if API_KEY else {}
+    with httpx.Client(timeout=timeout, follow_redirects=True, headers=headers) as client:
         r = client.get(f"{BASE}{path}", params=_params(params))
+        if r.status_code == 429:
+            raise OpenAlexUnavailable(
+                "OpenAlex is out of request budget for this network. Free keys have "
+                "their own budget: set OPENALEX_API_KEY in apps/api/.env "
+                "(https://help.openalex.org/api/authentication)."
+            )
         r.raise_for_status()
         return r.json()
 
