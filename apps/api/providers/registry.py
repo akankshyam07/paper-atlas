@@ -1,11 +1,13 @@
-"""Single place that picks a provider implementation. Swap sponsor impls here
-via env vars; the rest of the app calls get_* and never sees the vendor.
+"""Single place that picks provider implementations (PRD §37).
 
-Example (later):
-    if os.getenv("LLM_PROVIDER") == "openai":
-        from providers.openai_llm import OpenAILLM
-        return OpenAILLM()
+Each getter prefers the real sponsor implementation when its credentials are
+present and falls back to a stub, so the app always runs — with no key it is a
+working demo, with a key it is the real thing. Nothing outside this module
+imports a vendor SDK.
 """
+from __future__ import annotations
+
+import os
 from functools import lru_cache
 
 from providers.base import (
@@ -21,29 +23,42 @@ from providers.stubs import (
 
 @lru_cache
 def get_llm() -> LLMProvider:
-    return StubLLM()  # TODO: OpenAILLM() when OPENAI_API_KEY set
+    if os.getenv("OPENAI_API_KEY"):
+        try:
+            from providers.openai_llm import OpenAILLM
+            return OpenAILLM()
+        except Exception:  # SDK missing or bad key — keep the app usable
+            pass
+    return StubLLM()
 
 
 @lru_cache
 def get_embedding() -> EmbeddingProvider:
-    return StubEmbedding()  # TODO: OpenAIEmbedding()
+    if os.getenv("OPENAI_API_KEY"):
+        try:
+            from providers.openai_llm import OpenAIEmbedding
+            return OpenAIEmbedding()
+        except Exception:
+            pass
+    return StubEmbedding()
 
 
 @lru_cache
 def get_search() -> SearchProvider:
-    return StubSearch()  # TODO: ElasticSearchProvider() when ELASTIC_URL set
+    # TODO: ElasticSearchProvider() when ELASTIC_URL is set.
+    return StubSearch()
 
 
 @lru_cache
 def get_research_data() -> ResearchDataProvider:
-    # TODO: OpenAlexProvider() (default) / VoloridgeProvider() when available.
-    from openalex.client import OpenAlexProvider  # local import: stub for now
+    from openalex.client import OpenAlexProvider
     return OpenAlexProvider()
 
 
 @lru_cache
 def get_inference_optimizer() -> InferenceOptimizationProvider:
-    return PassthroughInferenceOptimizer()  # TODO: TokenCompanyOptimizer() (LLM cost saving)
+    # TODO: TokenCompanyOptimizer() (LLM cost saving) when its key is set.
+    return PassthroughInferenceOptimizer()
 
 
 @lru_cache

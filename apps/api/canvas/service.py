@@ -135,3 +135,24 @@ def ingest_file(db: Session, *, canvas_id: uuid.UUID, data: bytes, filename: str
         db, canvas_id=canvas_id, object_type="PAPER", title=filename,
         content={"filename": filename}, source_entity_id=entity.id,
     )
+
+
+def get_object(db: Session, object_id: uuid.UUID) -> CanvasObject | None:
+    return db.get(CanvasObject, object_id)
+
+
+def canvas_openalex_ids(db: Session, canvas_id: uuid.UUID) -> set[str]:
+    """Every OpenAlex id already on this canvas — the recommender excludes them
+    so suggestions move the graph forward instead of looping (PRD §13.5)."""
+    rows = db.execute(
+        select(CanvasObject.content).where(
+            CanvasObject.canvas_id == canvas_id,
+            CanvasObject.deleted_at.is_(None),
+        )
+    ).scalars().all()
+    ids: set[str] = set()
+    for content in rows:
+        oid = (content or {}).get("openalexId")
+        if oid:
+            ids.add(oid)
+    return ids
