@@ -132,6 +132,35 @@ def discover_route(q: str, kind: str = "foundational", limit: int = 5) -> Recomm
     ) for r in recs])
 
 
+@router.get("/topics")
+def topics(level: str = "field", parent: str | None = None, q: str | None = None) -> dict:
+    """Interest taxonomy for onboarding (PRD §12 topic hierarchy).
+
+    Without a query this walks the tree one level at a time — fields, then the
+    subfields of a field, then the topics of a subfield — so the picker expands
+    in place rather than dumping hundreds of tags at once. With a query it
+    searches topics directly, for people who already know what they want.
+    """
+    provider = get_research_data()
+    if q:
+        rows = provider.search_topics(q)
+        return {"level": "topic", "items": [{
+            "id": mapping.short_id(r.get("id")),
+            "name": r.get("display_name"),
+            "worksCount": r.get("works_count") or 0,
+            "parent": ((r.get("subfield") or {}).get("display_name")
+                       or (r.get("field") or {}).get("display_name")),
+        } for r in rows]}
+
+    rows = provider.taxonomy(level, mapping.short_id(parent) if parent else None)
+    return {"level": level, "items": [{
+        "id": mapping.short_id(r.get("id")),
+        "name": r.get("display_name"),
+        "worksCount": r.get("works_count") or 0,
+        "parent": None,
+    } for r in rows]}
+
+
 @router.get("/random", response_model=SearchResponse)
 def random_work(topic: str | None = None, seed: int | None = None) -> SearchResponse:
     """A random well-cited paper, optionally within a topic.

@@ -73,6 +73,7 @@ export function CanvasShell({ id }: { id: string }) {
   // two-sided. Applied to edges the user draws.
   const [connector, setConnector] = useState<"line" | "arrow" | "biarrow">("arrow");
   const boardRef = useRef<HTMLDivElement>(null);
+  const seeded = useRef(false);
   // Interim speech, shown grey above the field until it is committed.
   const [partial, setPartial] = useState("");
   const [tool, setTool] = useState<"select" | "pan">("select");
@@ -128,6 +129,26 @@ export function CanvasShell({ id }: { id: string }) {
     const r = el?.getBoundingClientRect();
     return flow.screenToFlowPosition({ x: (r?.left ?? 0) + (r?.width ?? 800) / 2 - NODE_W / 2, y: (r?.top ?? 0) + (r?.height ?? 600) / 2 - NODE_H / 2 });
   }, [flow]);
+
+  // A canvas started from a suggestion carries the paper in the url, so it
+  // opens with that paper already on the board.
+  useEffect(() => {
+    if (seeded.current || !doc) return;
+    const wanted = new URLSearchParams(window.location.search).get("add");
+    if (!wanted) return;
+    seeded.current = true;
+    (async () => {
+      try {
+        const pos = centre();
+        const { object } = await api.addObject({
+          canvasId: doc.id, objectType: "PAPER", openalexId: wanted,
+          content: { openalexId: wanted }, x: pos.x, y: pos.y,
+        });
+        update((d) => ({ ...d, nodes: [...d.nodes, toNode("paper", object)] }));
+        window.history.replaceState({}, "", window.location.pathname);
+      } catch { /* the board still opens, just empty */ }
+    })();
+  }, [doc, centre, update]);
 
   // ---- React Flow change plumbing ----
   const onNodesChange = useCallback((changes: NodeChange[]) => {

@@ -505,3 +505,34 @@ a:hover { color: var(--accent-hover); }
 .nav-item { position: relative; }
 .nav-count { margin-left: auto; font-size: 10px; color: var(--ink-5);
   background: var(--bg-2); border-radius: 999px; padding: 1px 6px; }
+
+/* ---- Onboarding interest picker ---------------------------------------- */
+.onboard { width: min(720px, 92vw); max-height: 84vh; background: var(--surface);
+  border-radius: 16px; box-shadow: 0 24px 70px rgba(0,0,0,0.35);
+  display: flex; flex-direction: column; overflow: hidden; }
+.onboard-head { padding: 22px 24px 4px; }
+.onboard-head h2 { font-size: 19px; margin: 0 0 4px; }
+.onboard-head p { margin: 0; font-size: 13px; color: var(--ink-4); }
+.onboard-search { margin: 14px 24px 6px; width: calc(100% - 48px); }
+.onboard-body { padding: 8px 24px 16px; overflow: auto; }
+.onboard-field { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 3px 0; }
+.tag { border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
+  padding: 5px 12px; font-size: 12.5px; color: var(--ink-2); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; transition: all 0.12s; }
+.tag:hover { border-color: var(--bar); color: var(--ink); }
+.tag.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tag.lg { font-size: 13px; padding: 6px 14px; }
+.tag.ghost { border-style: dashed; color: var(--ink-5); padding: 5px 9px; }
+.tag-sub { font-size: 10.5px; opacity: 0.65; }
+.tagwrap { display: flex; flex-wrap: wrap; gap: 6px; }
+.tagwrap.nested { width: 100%; padding: 6px 0 10px 14px; border-left: 1px solid var(--line-2); margin-left: 4px; }
+.onboard-foot { display: flex; align-items: center; gap: 8px; padding: 14px 24px;
+  border-top: 1px solid var(--line-2); }
+
+/* Suggestions on the home screen, from the chosen interests. */
+.suggested { margin-bottom: 20px; }
+.suggested-row { display: flex; gap: 10px; overflow-x: auto; padding: 8px 0 2px; }
+.suggest-card { flex: none; width: 210px; text-align: left; font-size: 12.5px; line-height: 1.35;
+  padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface); color: var(--ink); cursor: pointer; }
+.suggest-card:hover { border-color: var(--accent); box-shadow: var(--shadow-1); }

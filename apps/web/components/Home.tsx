@@ -4,6 +4,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createCanvas, deleteCanvas, listCanvases, loadCanvas, renameCanvas, type CanvasMeta } from "../lib/store";
+import { Onboarding, hasOnboarded, readInterests, type Topic } from "./Onboarding";
+import { api } from "../lib/api";
 
 const VIEWS = ["All canvases", "Recent"] as const;
 
@@ -52,8 +54,25 @@ export function Home() {
   const [list, setList] = useState<CanvasMeta[] | null>(null);
   const [view, setView] = useState<(typeof VIEWS)[number]>("All canvases");
   const [menu, setMenu] = useState<string | null>(null);
+  const [onboarding, setOnboarding] = useState(false);
+  const [suggested, setSuggested] = useState<{ title: string; openalexId: string }[]>([]);
   const refresh = () => setList(listCanvases());
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+    // Ask once. Skipping counts as answering, so it is not asked again.
+    if (!hasOnboarded()) setOnboarding(true);
+    else loadSuggestions(readInterests());
+  }, []);
+
+  // Interests drive what the home screen offers, so the picker has a visible
+  // consequence rather than being a form that vanishes.
+  const loadSuggestions = (topics: Topic[]) => {
+    if (!topics.length) return setSuggested([]);
+    const pick = topics[Math.floor(Math.random() * topics.length)];
+    api.search(pick.name, 4)
+      .then((r) => setSuggested(r.results.map((p) => ({ title: p.title, openalexId: p.openalexId }))))
+      .catch(() => setSuggested([]));
+  };
   useEffect(() => {
     // Close on an outside click only. Relying on stopPropagation alone let the
     // same click that opened the menu immediately close it again, so the menu
@@ -77,8 +96,16 @@ export function Home() {
   };
   const shown = view === "Recent" ? (list ?? []).slice(0, 6) : list ?? [];
 
+  const startFrom = (openalexId: string, title: string) => {
+    const c = createCanvas(title.slice(0, 60));
+    router.push(`/c/${c.id}?add=${encodeURIComponent(openalexId)}`);
+  };
+
   return (
     <div className="home">
+      {onboarding && (
+        <Onboarding onDone={(picked) => { setOnboarding(false); loadSuggestions(picked); }} />
+      )}
       <aside className="home-rail">
         <button className="rail-new" onClick={create}>+ New canvas</button>
         {VIEWS.map((v) => (
@@ -92,6 +119,18 @@ export function Home() {
           <div className="grow" />
           <span className="hint">Recent ▾</span>
         </div>
+        {suggested.length > 0 && (
+          <div className="suggested">
+            <div className="eyebrow">Based on your interests</div>
+            <div className="suggested-row">
+              {suggested.map((p) => (
+                <button key={p.openalexId} className="suggest-card" onClick={() => startFrom(p.openalexId, p.title)}>
+                  {p.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="cards">
           {shown.map((c) => (
             <div key={c.id} className="card" role="link" tabIndex={0} onClick={() => router.push(`/c/${c.id}`)} onKeyDown={(e) => e.key === "Enter" && router.push(`/c/${c.id}`)}>

@@ -197,3 +197,47 @@ class OpenAlexProvider:
         results = data.get("results") or []
         _put_cached(key, results, SEARCH_TTL)
         return results
+
+
+    # ---- topic hierarchy (domain -> field -> subfield -> topic) ----
+
+    def taxonomy(self, level: str, parent_id: str | None = None, *, per_page: int = 60) -> list[dict[str, Any]]:
+        """Browse OpenAlex's own classification: fields, then subfields, then
+        topics. Used by onboarding so interests come from the real corpus
+        instead of a hand-written list that would drift."""
+        path = {"field": "/fields", "subfield": "/subfields", "topic": "/topics"}.get(level)
+        if not path:
+            return []
+        params: dict[str, Any] = {"per-page": per_page, "select": "id,display_name,works_count"}
+        if parent_id and level == "subfield":
+            params["filter"] = f"field.id:{parent_id}"
+        elif parent_id and level == "topic":
+            params["filter"] = f"subfield.id:{parent_id}"
+        params["sort"] = "works_count:desc"
+        key = f"tax:{level}:{parent_id}:{per_page}"
+        cached = _get_cached(key)
+        if cached is not None:
+            return cached
+        try:
+            data = _request(path, params)
+        except httpx.HTTPError:
+            return []
+        results = data.get("results") or []
+        _put_cached(key, results, WORK_TTL)
+        return results
+
+    def search_topics(self, query: str, *, per_page: int = 25) -> list[dict[str, Any]]:
+        key = f"toposearch:{query}:{per_page}"
+        cached = _get_cached(key)
+        if cached is not None:
+            return cached
+        try:
+            data = _request("/topics", {
+                "search": query, "per-page": per_page,
+                "select": "id,display_name,works_count,subfield,field",
+            })
+        except httpx.HTTPError:
+            return []
+        results = data.get("results") or []
+        _put_cached(key, results, SEARCH_TTL)
+        return results
