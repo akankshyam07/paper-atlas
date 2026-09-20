@@ -11,10 +11,6 @@ export function Sidebar({ currentId, onSearch }: { currentId?: string; onSearch:
 
   return (
     <aside className="rail">
-      <div className="rail-head">
-        <span aria-hidden style={{ width: 18, height: 18, borderRadius: 5, background: "var(--ink)", display: "inline-block" }} />
-        Paper Atlas
-      </div>
       <div className="rail-body">
         <button className="rail-search" onClick={onSearch}>
           <span>⌕</span>Search<span className="kbd">⌘K</span>

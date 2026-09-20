@@ -15,6 +15,7 @@ import { bbox, fanOut, NODE_H, NODE_W } from "../../lib/layout";
 import { isSuppressed, uid, useCanvasDoc, type ChatMessage, type EdgeData, type NodeData, type NodeKind } from "../../lib/store";
 import { Sidebar } from "../Sidebar";
 import { BoardActionsContext, type BoardActions } from "./actions";
+import { Lightbox } from "../panel/Lightbox";
 import { EmptyState } from "./EmptyState";
 import { PaperNode } from "../nodes/PaperNode";
 import { SuggestionNode } from "../nodes/SuggestionNode";
@@ -49,6 +50,10 @@ export function CanvasShell({ id }: { id: string }) {
   const [zoom, setZoom] = useState(1);
   const [tab, setTab] = useState<PanelTab>("Objects");
   const [panelOpen, setPanelOpen] = useState(true);
+  // Connector style for new links: straight line, one-sided curved arrow, or
+  // two-sided. Applied to edges the user draws.
+  const [connector, setConnector] = useState<"line" | "arrow" | "biarrow">("arrow");
+  const [lightboxId, setLightboxId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [palette, setPalette] = useState<{ open: boolean; query?: string }>({ open: false });
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -451,6 +456,7 @@ export function CanvasShell({ id }: { id: string }) {
 
   const actions = useMemo<BoardActions>(() => ({
     open: (nid) => { setDetailId(nid); setTab("Details"); setPanelOpen(true); },
+    pdfUrl: (nid) => pdfBlobs.get(nid) ?? (byId(nid)?.data.object.content.pdfUrl as string | undefined),
     chatAbout,
     menu: (nid, x, y) => setMenu({ id: nid, x, y }),
     accept: acceptSuggestion,
@@ -500,7 +506,8 @@ export function CanvasShell({ id }: { id: string }) {
                 onConnect={onConnect}
                 onMoveEnd={onMoveEnd}
                 onNodeContextMenu={(e, n) => { e.preventDefault(); setMenu({ id: n.id, x: e.clientX, y: e.clientY }); }}
-                onNodeDoubleClick={(_, n) => n.type !== "group" && actions.open(n.id)}
+                // Double-click opens the full centred viewer; groups just expand in place.
+                onNodeDoubleClick={(_, n) => { if (n.type !== "group") setLightboxId(n.id); }}
                 onPaneClick={() => { setMenu(null); setDetailId(null); }}
                 deleteKeyCode={["Backspace", "Delete"]}
                 multiSelectionKeyCode="Shift"
@@ -513,7 +520,11 @@ export function CanvasShell({ id }: { id: string }) {
                 snapToGrid
                 snapGrid={[12, 12]}
                 proOptions={{ hideAttribution: true }}
-                defaultEdgeOptions={{ type: "default" }}
+                defaultEdgeOptions={{
+                  type: connector === "line" ? "straight" : "default",
+                  markerEnd: connector === "line" ? undefined : { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "#c7c7cc" },
+                  markerStart: connector === "biarrow" ? { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "#c7c7cc" } : undefined,
+                }}
               >
                 <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="var(--dot)" />
                 {real.length > 3 && <MiniMap pannable zoomable style={{ width: 150, height: 96 }} nodeColor={(n) => (n.type === "paper" ? "#d2d2d7" : n.type === "ai" ? "#9ec8f5" : "#e8e8ea")} maskColor="rgba(251,251,252,0.7)" />}
@@ -521,18 +532,22 @@ export function CanvasShell({ id }: { id: string }) {
               <div className="tools" role="toolbar" aria-label="Tools">
                 <button className="tool" aria-pressed title="Select (drag to marquee, space+drag or middle-click to pan)">↖</button>
                 <button className="tool" title="Group selection (⌘G)" onClick={groupSelection}>▭</button>
+                <button className={`tool${connector === "line" ? " on" : ""}`} title="Line connector" aria-pressed={connector === "line"} onClick={() => setConnector("line")}>╱</button>
+                <button className={`tool${connector === "arrow" ? " on" : ""}`} title="Curved arrow (one-sided)" aria-pressed={connector === "arrow"} onClick={() => setConnector("arrow")}>→</button>
+                <button className={`tool${connector === "biarrow" ? " on" : ""}`} title="Curved arrow (two-sided)" aria-pressed={connector === "biarrow"} onClick={() => setConnector("biarrow")}>↔</button>
                 <button className="tool" title="New note" onClick={() => addNote().catch(fail("Note"))}>✎</button>
                 <button className="tool" title="Upload PDF" onClick={() => fileInput.current?.click()}>⇪</button>
                 <button className="tool accent" title="Ask AI" onClick={() => { setPanelOpen(true); setTab("Chat"); }}>✦</button>
               </div>
               {real.length === 0 && <EmptyState onSearch={() => setPalette({ open: true })} onUpload={() => fileInput.current?.click()} onDrop={addFiles} />}
               <form className="chatbar" onSubmit={(e) => { e.preventDefault(); setPanelOpen(true); setTab("Chat"); send(); }}>
-                <span style={{ color: "var(--accent)" }}>✦</span>
-                <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask about this canvas…" aria-label="Ask about this canvas" onFocus={() => { setPanelOpen(true); setTab("Chat"); }} />
-                {selected.length > 0 && <span className="pill">{selected.length} selected</span>}
-                <button type="button" className="mic" aria-pressed={recording} onClick={toggleMic} title="Voice input">🎙</button>
+                <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask anything" aria-label="Ask about this canvas" onFocus={() => { setPanelOpen(true); setTab("Chat"); }} />
+                <button type="button" aria-pressed={recording} onClick={toggleMic} title="Voice input">🎙</button>
               </form>
             </div>
+            {lightboxId && byId(lightboxId) && (
+              <Lightbox node={byId(lightboxId)!} pdfUrl={actions.pdfUrl(lightboxId)} onClose={() => setLightboxId(null)} />
+            )}
             {panelOpen && (
               <SidePanel
                 tab={tab} onTab={setTab} wide={tab === "Details" && !!detail}
