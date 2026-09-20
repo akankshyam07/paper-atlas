@@ -15,6 +15,9 @@ apps/api        FastAPI backend                   (branches: backend-data, backe
 packages/types  shared API contract
 ```
 
+Sponsor integrations live behind provider interfaces in `apps/api/providers/`
+(OpenAI, Elastic, Dropbox, Deepgram, Token Company); see [docs/SPONSORS.md](docs/SPONSORS.md).
+
 ## Database (backend)
 
 ```bash

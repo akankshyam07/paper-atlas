@@ -102,3 +102,37 @@ export interface ExplainResponse {
   object: CanvasObject; // the created AI_SUMMARY note
   edge: ObjectEdge; // EXPLAINS edge back to the source
 }
+
+// ==== Sponsor-feature endpoints ====
+
+// Dropbox import (FileSourceProvider). PRD §7/§10/§23.
+export interface DropboxFile {
+  id: string;
+  name: string;
+  path: string;
+}
+// GET /integrations/dropbox/files?path=
+export interface DropboxListResponse {
+  files: DropboxFile[];
+}
+// POST /integrations/dropbox/import  -> pulls file, runs upload/parse, places object
+export interface DropboxImportRequest {
+  canvasId: string;
+  fileId: string;
+  x: number;
+  y: number;
+}
+export interface DropboxImportResponse {
+  object: CanvasObject; // the placed PDF/paper object
+}
+
+// Speech (SpeechProvider, optional). PRD §17.
+// POST /speech/transcribe  (multipart audio) -> text for the chat bar
+export interface TranscribeResponse {
+  text: string;
+}
+// POST /speech/synthesize  -> audio for read-aloud of an AI artifact
+export interface SynthesizeRequest {
+  text: string;
+}
+// returns audio bytes (audio/mpeg); no JSON body

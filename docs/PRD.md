@@ -61,6 +61,7 @@ The MVP must prove the central loop:
 - Canvas object list / navigator
 - Research paper objects
 - Uploaded PDF objects
+- Import files from Dropbox (Dropbox as a file source)
 - Wikipedia article objects
 - Excerpt objects
 - Note objects
@@ -68,6 +69,8 @@ The MVP must prove the central loop:
 - Chat Thread objects
 - Image objects
 - Basic external/web objects where embeddable
+- Voice input to canvas chat (optional; speech-to-text)
+- Read-aloud of AI artifacts (optional; text-to-speech)
 - Typed edges
 - Manual linking
 - Grouping / frames
@@ -138,6 +141,7 @@ The MVP must prove the central loop:
 
 6. As a user, I want to search OpenAlex and place a paper on my canvas.
 7. As a user, I want to upload a PDF and have the app identify whether it corresponds to an OpenAlex work.
+7a. As a user, I want to import research PDFs from my Dropbox so my existing files become canvas objects without re-uploading.
 8. As a user, I want to inspect a paper's authors, abstract, publication metadata, topics, citations, cited-by works, and open-access status.
 9. As a user, I want to expand a paper into a readable full viewer.
 10. As a user, I want citations in a paper to open candidate research-paper nodes.
@@ -156,6 +160,7 @@ The MVP must prove the central loop:
 ### Chat
 
 19. As a user, I want a canvas-level chat that can reason across the current board.
+19a. As a user, I optionally want to speak my chat query and hear AI explanations read aloud.
 20. As a user, I want to select nodes as explicit context.
 21. As a user, I want to start a thread from a node and preserve that node as initial context.
 22. As a user, I want a useful chat to become its own graph node.
@@ -567,6 +572,20 @@ Atomic operation:
 4. Link artifact to excerpt with EXPLAINS or SUMMARIZES.
 
 ---
+
+### Import from Dropbox
+Dropbox is a file source, not a separate object type. Importing a Dropbox file:
+1. List the user's Dropbox files via `FileSourceProvider` (Dropbox SDK isolated
+   in `providers/dropbox_files.py`; the app calls the interface only).
+2. Download the chosen file and run it through the SAME upload/parse pipeline as
+   a manual upload.
+3. Deduplicate against OpenAlex by DOI/title (PRD §23) so a Dropbox PDF resolves
+   to the same canonical source entity as an equivalent uploaded or fetched one.
+4. Place the resulting object on the canvas.
+
+This directly serves the Dropbox challenge: fragmented Dropbox files become
+organized, inspectable research objects. Never let the Dropbox SDK leak outside
+its provider (PRD §37).
 
 ## 11. Wikipedia Concept Linking
 
@@ -980,6 +999,13 @@ No invisible memory sharing between threads.
 
 ---
 
+### Optional voice (Deepgram)
+Voice is an optional layer over chat, off the core research path:
+- Speech-to-text for the chat input via `SpeechProvider` (`POST /speech/transcribe`).
+- Text-to-speech read-aloud of AI artifacts (`POST /speech/synthesize`).
+Deepgram SDK is isolated in `providers/deepgram_speech.py`. Disabling voice must
+not affect any core flow.
+
 ## 18. Search
 
 MVP global command/search surface should support:
@@ -1331,6 +1357,7 @@ Track:
 
 ### PDF
 - upload PDF
+- import a PDF from Dropbox and place it as an object
 - select text
 - create excerpt
 - add note
@@ -1356,6 +1383,7 @@ Track:
 - AI may create proposed artifacts
 - mutations require approval unless triggered by an explicit direct action
 - generated artifacts preserve provenance
+- (optional) voice input transcribes into chat; AI artifact reads aloud
 
 ### Retrieval
 - selected nodes have highest retrieval priority

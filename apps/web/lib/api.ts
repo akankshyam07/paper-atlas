@@ -6,6 +6,8 @@ import type {
   AddEdgeRequest, AddEdgeResponse,
   RecommendRequest, RecommendResponse,
   ExplainRequest, ExplainResponse,
+  DropboxListResponse, DropboxImportRequest, DropboxImportResponse,
+  TranscribeResponse,
 } from "../../../packages/types/api";
 
 const BASE = "/api"; // rewritten to the FastAPI server in next.config.mjs
@@ -31,4 +33,19 @@ export const api = {
     post("/recommend", req),
   explain: (req: ExplainRequest): Promise<ExplainResponse> =>
     post("/explain", req),
+  dropboxList: (path = ""): Promise<DropboxListResponse> =>
+    fetch(`${BASE}/integrations/dropbox/files?path=${encodeURIComponent(path)}`).then((r) => r.json()),
+  dropboxImport: (req: DropboxImportRequest): Promise<DropboxImportResponse> =>
+    post("/integrations/dropbox/import", req),
+  transcribe: (audio: Blob): Promise<TranscribeResponse> => {
+    const fd = new FormData();
+    fd.append("audio", audio);
+    return fetch(`${BASE}/speech/transcribe`, { method: "POST", body: fd }).then((r) => r.json());
+  },
+  synthesize: (text: string): Promise<Blob> =>
+    fetch(`${BASE}/speech/synthesize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    }).then((r) => r.blob()),
 };
