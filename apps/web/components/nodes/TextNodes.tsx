@@ -15,10 +15,13 @@ const Handles = () => (
 );
 
 export const NoteNode = memo(function NoteNode({ id, data }: NodeProps<NodeData>) {
+  const nc = data.object.content as { variant?: string; color?: string };
+  const variant = nc.variant ?? "sticky";
+  const color = nc.color ?? "butter";
   const a = useBoardActions();
   const text = String(data.object.content.text ?? "");
   return (
-    <div className="node note">
+    <div className={`node note ${variant === "sticky" ? `sticky note-${color}` : ""}`}>
       <QuickActions id={id} />
       <div className="eyebrow">Note</div>
       <textarea

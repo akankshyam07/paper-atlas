@@ -84,7 +84,6 @@ export function Home() {
           ))}
           <button className="card new" onClick={create}>+ New canvas</button>
         </div>
-        {list && list.length === 0 && <p className="hint" style={{ marginTop: 18 }}>No canvases yet — start one and drop in a paper.</p>}
       </main>
     </div>
   );

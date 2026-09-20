@@ -15,6 +15,7 @@ import { bbox, fanOut, NODE_H, NODE_W } from "../../lib/layout";
 import { isSuppressed, uid, useCanvasDoc, type ChatMessage, type EdgeData, type NodeData, type NodeKind } from "../../lib/store";
 import { Sidebar } from "../Sidebar";
 import { BoardActionsContext, type BoardActions } from "./actions";
+import { MicIcon, ArrowIcon, BiArrowIcon, CursorIcon, EmbedIcon, FileIcon, GroupIcon, HandIcon, HelpIcon, LineIcon, PaperIcon, PlusIcon, SparkIcon, StickyIcon, TextIcon, ThreadIcon, WikiIcon } from "./Icons";
 import { Help } from "./Help";
 import { Lightbox } from "../panel/Lightbox";
 import { EmptyState } from "./EmptyState";
@@ -72,6 +73,9 @@ export function CanvasShell({ id }: { id: string }) {
   // two-sided. Applied to edges the user draws.
   const [connector, setConnector] = useState<"line" | "arrow" | "biarrow">("arrow");
   const boardRef = useRef<HTMLDivElement>(null);
+  // Interim speech, shown grey above the field until it is committed.
+  const [partial, setPartial] = useState("");
+  const [tool, setTool] = useState<"select" | "pan">("select");
   const [helpOpen, setHelpOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [lightboxId, setLightboxId] = useState<string | null>(null);
@@ -158,10 +162,14 @@ export function CanvasShell({ id }: { id: string }) {
     update((d) => ({ ...d, nodes: [...d.nodes, toNode(kind, object, extra, style)] }));
   }, [update]);
 
-  const addNote = useCallback(async (text = "", at?: { x: number; y: number }, linkFrom?: string) => {
+  const addNote = useCallback(async (text = "", at?: { x: number; y: number }, linkFrom?: string, variant: "sticky" | "text" = "sticky") => {
     if (!doc) return;
     const pos = at ?? centre();
-    const { object } = await api.addObject({ canvasId: doc.id, objectType: "NOTE", content: { text }, x: pos.x, y: pos.y });
+    // Sticky notes get a pastel from a fixed rotation so a board of them still
+    // reads as one palette rather than confetti.
+    const palette = ["butter", "mint", "sky", "blush", "lilac"] as const;
+    const color = palette[(doc.nodes.length + palette.length) % palette.length];
+    const { object } = await api.addObject({ canvasId: doc.id, objectType: "NOTE", content: { text, variant, color }, x: pos.x, y: pos.y });
     let edge: Edge<EdgeData> | null = null;
     if (linkFrom) {
       const { edge: e } = await api.addEdge({ canvasId: doc.id, sourceObjectId: linkFrom, targetObjectId: object.id, edgeType: "DERIVED_FROM" });
@@ -397,6 +405,17 @@ export function CanvasShell({ id }: { id: string }) {
     }
   }, [doc, centre, update, fail]);
 
+  const addWikipedia = useCallback(async () => {
+    const q = window.prompt("Wikipedia article or topic");
+    if (!q?.trim()) return;
+    const term = q.trim();
+    // A bare topic becomes an article URL; a pasted link is used as given.
+    const url = /^https?:\/\//.test(term)
+      ? term
+      : `https://en.wikipedia.org/wiki/${encodeURIComponent(term.replace(/\s+/g, "_"))}`;
+    await addEmbed(url);
+  }, [addEmbed]);
+
   const removeNodes = useCallback((ids: string[]) => {
     const rm = new Set(ids);
     update((d) => ({ ...d, nodes: d.nodes.filter((n) => !rm.has(n.id) && !(n.parentNode && rm.has(n.parentNode))), edges: d.edges.filter((e) => !rm.has(e.source) && !rm.has(e.target)) }));
@@ -608,6 +627,8 @@ export function CanvasShell({ id }: { id: string }) {
                 nodes={nodes}
                 edges={edges}
                 nodeTypes={nodeTypes}
+                panOnDrag={tool === "pan" ? true : [1, 2]}
+                selectionOnDrag={tool === "select"}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onNodeDragStart={onNodeDragStart}
@@ -619,8 +640,6 @@ export function CanvasShell({ id }: { id: string }) {
                 onPaneClick={() => { setMenu(null); setDetailId(null); }}
                 deleteKeyCode={["Backspace", "Delete"]}
                 multiSelectionKeyCode="Shift"
-                selectionOnDrag
-                panOnDrag={[1, 2]}
                 panOnScroll
                 zoomOnDoubleClick={false}
                 minZoom={0.2}
@@ -638,34 +657,41 @@ export function CanvasShell({ id }: { id: string }) {
                 {real.length > 3 && <MiniMap pannable zoomable style={{ width: 150, height: 96 }} nodeColor={(n) => (n.type === "paper" ? "#d2d2d7" : n.type === "ai" ? "#9ec8f5" : "#e8e8ea")} maskColor="rgba(251,251,252,0.7)" />}
               </ReactFlow>
               <div className="tools" role="toolbar" aria-label="Tools">
-                <button className="tool" aria-pressed title="Select (drag to marquee, space+drag or middle-click to pan)">↖</button>
-                <button className="tool" title="Group selection (⌘G)" onClick={groupSelection}>▭</button>
-                <button className={`tool${connector === "line" ? " on" : ""}`} title="Line connector" aria-pressed={connector === "line"} onClick={() => setConnector("line")}>╱</button>
-                <button className={`tool${connector === "arrow" ? " on" : ""}`} title="Curved arrow (one-sided)" aria-pressed={connector === "arrow"} onClick={() => setConnector("arrow")}>→</button>
-                <button className={`tool${connector === "biarrow" ? " on" : ""}`} title="Curved arrow (two-sided)" aria-pressed={connector === "biarrow"} onClick={() => setConnector("biarrow")}>↔</button>
-                <button className="tool" title="New note" onClick={() => addNote().catch(fail("Note"))}>✎</button>
-                <button className="tool" title="Upload file" onClick={() => fileInput.current?.click()}>⇪</button>
-                {/* Adding objects must stay reachable once the board is no
-                    longer empty — the empty state's buttons disappear. */}
+                <button className={`tool${tool === "select" ? " on" : ""}`} title="Click — select and move" aria-pressed={tool === "select"} onClick={() => setTool("select")}><CursorIcon /></button>
+                <button className={`tool${tool === "pan" ? " on" : ""}`} title="Drag — pan the canvas" aria-pressed={tool === "pan"} onClick={() => setTool("pan")}><HandIcon /></button>
+                <span className="tool-sep" />
                 <div className="add-wrap">
-                  <button className={`tool add${addOpen ? " on" : ""}`} title="Add to canvas"
-                    aria-expanded={addOpen} onClick={() => setAddOpen((v) => !v)}>+</button>
+                  <button className={`tool${addOpen ? " on" : ""}`} title="Add to canvas" aria-expanded={addOpen} onClick={() => setAddOpen((v) => !v)}><PlusIcon /></button>
                   {addOpen && (
                     <div className="popover add-menu" onMouseLeave={() => setAddOpen(false)}>
-                      <button className="menu-item" onClick={() => { setAddOpen(false); setPalette({ open: true }); }}>Search OpenAlex</button>
-                      <button className="menu-item" onClick={() => { setAddOpen(false); fileInput.current?.click(); }}>Upload file…</button>
-                      <button className="menu-item" onClick={() => { setAddOpen(false); addEmbed(); }}>Embed link…</button>
-                      <button className="menu-item" onClick={() => { setAddOpen(false); addNote().catch(fail("Note")); }}>New note</button>
+                      <button className="menu-item" onClick={() => { setAddOpen(false); setPalette({ open: true }); }}><PaperIcon /> Paper</button>
+                      <button className="menu-item" onClick={() => { setAddOpen(false); addWikipedia(); }}><WikiIcon /> Wikipedia</button>
+                      <button className="menu-item" onClick={() => { setAddOpen(false); fileInput.current?.click(); }}><FileIcon /> File</button>
+                      <button className="menu-item" onClick={() => { setAddOpen(false); addEmbed(); }}><EmbedIcon /> Embed link</button>
+                      <button className="menu-item" onClick={() => { setAddOpen(false); addNote("", undefined, undefined, "text").catch(fail("Text")); }}><TextIcon /> Text</button>
+                      <button className="menu-item" onClick={() => { setAddOpen(false); addNote("", undefined, undefined, "sticky").catch(fail("Note")); }}><StickyIcon /> Sticky note</button>
+                      <button className="menu-item" onClick={() => { setAddOpen(false); setPanelOpen(true); setTab("Chat"); }}><ThreadIcon /> Thread</button>
                     </div>
                   )}
                 </div>
-                <button className="tool accent" title="Ask AI" onClick={() => { setPanelOpen(true); setTab("Chat"); }}>✦</button>
+                <button className="tool" title="Group selection (⌘G)" onClick={groupSelection}><GroupIcon /></button>
+                <span className="tool-sep" />
+                <button className={`tool${connector === "line" ? " on" : ""}`} title="Line connector" aria-pressed={connector === "line"} onClick={() => setConnector("line")}><LineIcon /></button>
+                <button className={`tool${connector === "arrow" ? " on" : ""}`} title="Curved arrow" aria-pressed={connector === "arrow"} onClick={() => setConnector("arrow")}><ArrowIcon /></button>
+                <button className={`tool${connector === "biarrow" ? " on" : ""}`} title="Curved arrow, both ends" aria-pressed={connector === "biarrow"} onClick={() => setConnector("biarrow")}><BiArrowIcon /></button>
+                <span className="tool-sep" />
+                <button className="tool accent" title="Ask AI" onClick={() => { setPanelOpen(true); setTab("Chat"); }}><SparkIcon /></button>
               </div>
-              <button className="help-fab" title="Help — what everything does (?)" aria-label="Help" onClick={() => setHelpOpen(true)}>?</button>
+              <button className="help-fab" title="Help — what everything does (?)" aria-label="Help" onClick={() => setHelpOpen(true)}><HelpIcon /></button>
               {real.length === 0 && <EmptyState onSearch={() => setPalette({ open: true })} onUpload={() => fileInput.current?.click()} onDrop={addFiles} />}
               <form className="chatbar" onSubmit={(e) => { e.preventDefault(); setPanelOpen(true); setTab("Chat"); send(); }}>
+                {partial && <div className="chat-partial">{partial}</div>}
                 <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask anything" aria-label="Ask about this canvas" onFocus={() => { setPanelOpen(true); setTab("Chat"); }} />
-                <button type="button" aria-pressed={recording} onClick={toggleMic} title="Voice input">🎙</button>
+                <button type="button" className="voice" aria-pressed={recording} onClick={toggleMic} title={recording ? "Stop recording" : "Voice input"}>
+                  {recording
+                    ? <span className="waves" aria-hidden><i /><i /><i /><i /><i /></span>
+                    : <MicIcon />}
+                </button>
               </form>
             </div>
             {helpOpen && <Help onClose={() => setHelpOpen(false)} />}
