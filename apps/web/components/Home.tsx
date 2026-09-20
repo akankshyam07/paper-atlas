@@ -24,7 +24,14 @@ export function Home() {
   const refresh = () => setList(listCanvases());
   useEffect(() => { refresh(); }, []);
   useEffect(() => {
-    const off = () => setMenu(null);
+    // Close on an outside click only. Relying on stopPropagation alone let the
+    // same click that opened the menu immediately close it again, so the menu
+    // never appeared.
+    const off = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest(".card-menu") || t?.closest(".more")) return;
+      setMenu(null);
+    };
     document.addEventListener("click", off);
     return () => document.removeEventListener("click", off);
   }, []);
@@ -68,7 +75,7 @@ export function Home() {
               </div>
               <button className="more" aria-label="Canvas menu" aria-expanded={menu === c.id} onClick={(e) => { e.stopPropagation(); setMenu(menu === c.id ? null : c.id); }}>⋯</button>
               {menu === c.id && (
-                <div className="popover" style={{ position: "absolute", right: 6, top: 32, width: 150, padding: 4, zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
+                <div className="popover card-menu" style={{ position: "absolute", right: 6, top: 34, width: 150, padding: 4, zIndex: 20 }} onClick={(e) => e.stopPropagation()}>
                   <button className="menu-item" onClick={() => { setMenu(null); rename(c); }}>Rename</button>
                   <button className="menu-item danger" onClick={() => { setMenu(null); remove(c); }}>Delete</button>
                 </div>
