@@ -61,7 +61,7 @@ export const PaperNode = memo(function PaperNode({ id, data }: NodeProps<NodeDat
   ].filter(Boolean).join(" · ");
 
   return (
-    <div className={`node sheet${isBook ? " book" : ""}`}>
+    <div className={`node sheet${isBook ? " book" : ""}`} title="Right-click for Broader, Deeper and more · double-click to open">
       <QuickActions id={id} />
       <div className={`sheet-stage${isBook ? " spread" : ""} flip-${flip}`}>
         {src ? (

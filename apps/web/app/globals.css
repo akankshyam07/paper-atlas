@@ -536,3 +536,13 @@ a:hover { color: var(--accent-hover); }
   padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px;
   background: var(--surface); color: var(--ink); cursor: pointer; }
 .suggest-card:hover { border-color: var(--accent); box-shadow: var(--shadow-1); }
+
+/* A document preview is a card, not a live viewer: the iframe swallowed
+   right-click (showing the PDF reader's own menu) and drag, so Broader/Deeper
+   and moving the node were unreachable. Interaction belongs to the node; open
+   it full screen to interact with the document itself. */
+.node.sheet .leaf, .node.doc .doc-crop { pointer-events: none; }
+.node.sheet .leaf iframe, .node.doc .doc-crop iframe { pointer-events: none; }
+/* Controls layered over the preview stay clickable. */
+.node.sheet .node-actions, .node.sheet .pager,
+.node.doc .node-actions, .node.doc .pager { pointer-events: auto; }

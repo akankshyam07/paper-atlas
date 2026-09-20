@@ -99,16 +99,35 @@ def proxy_pdf(url: str) -> Response:
     except socket.gaierror:
         raise HTTPException(status_code=400, detail="unresolvable host")
 
+    # This response is rendered inside an iframe on the board, so a failure has
+    # to come back as something readable. A JSON error body was being displayed
+    # as raw text on the card. Open-access links do go dead — the record stays
+    # in OpenAlex after the file moves — so this is a normal outcome, not a bug.
+    def unavailable(reason: str) -> Response:
+        return Response(
+            content=(
+                "<!doctype html><meta charset=utf-8>"
+                "<style>body{margin:0;display:grid;place-items:center;height:100vh;"
+                "font:13px/1.5 system-ui,-apple-system,sans-serif;color:#86868b;"
+                "background:#fff;text-align:center;padding:24px}</style>"
+                f"<div>Preview unavailable<br><small>{reason}</small></div>"
+            ),
+            media_type="text/html",
+            headers={"X-Preview-Error": reason},
+        )
+
     try:
         with httpx.Client(timeout=20.0, follow_redirects=True) as client:
             r = client.get(url, headers={"User-Agent": "PaperAtlas/1.0"})
             r.raise_for_status()
             data = r.content
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"fetch failed: {e}")
+    except httpx.HTTPError:
+        return unavailable("the publisher's link is no longer reachable")
 
     if len(data) > storage.MAX_BYTES:
-        raise HTTPException(status_code=413, detail="pdf too large to preview")
+        return unavailable("this document is too large to preview")
+    if not data[:5].startswith(b"%PDF"):
+        return unavailable("that link does not return a PDF")
 
     return Response(
         content=data,
