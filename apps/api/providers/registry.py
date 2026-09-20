@@ -10,10 +10,12 @@ from functools import lru_cache
 
 from providers.base import (
     LLMProvider, EmbeddingProvider, SearchProvider,
-    ResearchDataProvider, InferenceOptimizationProvider,
+    ResearchDataProvider, InferenceOptimizationProvider, FileSourceProvider,
+    SpeechProvider,
 )
 from providers.stubs import (
     StubLLM, StubEmbedding, StubSearch, PassthroughInferenceOptimizer,
+    StubFileSource, StubSpeech,
 )
 
 
@@ -42,3 +44,13 @@ def get_research_data() -> ResearchDataProvider:
 @lru_cache
 def get_inference_optimizer() -> InferenceOptimizationProvider:
     return PassthroughInferenceOptimizer()  # TODO: TokenCompanyOptimizer()
+
+
+@lru_cache
+def get_file_source() -> FileSourceProvider:
+    return StubFileSource()  # TODO: DropboxFileSource() when DROPBOX_TOKEN set
+
+
+@lru_cache
+def get_speech() -> SpeechProvider:
+    return StubSpeech()  # TODO: DeepgramSpeech() when DEEPGRAM_API_KEY set

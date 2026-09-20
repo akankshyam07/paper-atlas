@@ -38,3 +38,17 @@ class ResearchDataProvider(Protocol):
 class InferenceOptimizationProvider(Protocol):
     # Token Company. Sits in front of the LLM call: compress/route long context.
     def optimize(self, prompt: str, **kw: Any) -> str: ...
+
+
+@runtime_checkable
+class FileSourceProvider(Protocol):
+    # Dropbox (challenge). Pull user files into the canvas; SDK isolated here.
+    def list_files(self, path: str = "") -> list[dict[str, Any]]: ...
+    def download(self, file_id: str) -> bytes: ...
+
+
+@runtime_checkable
+class SpeechProvider(Protocol):
+    # Deepgram (challenge). Voice input to chat + read-aloud; SDK isolated here.
+    def transcribe(self, audio: bytes, *, mime: str = "audio/wav") -> str: ...
+    def synthesize(self, text: str) -> bytes: ...

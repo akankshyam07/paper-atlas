@@ -12,12 +12,13 @@ Concrete redemption info for sponsors relevant to Paper Atlas. Source: HackMIT
 | **Meta** | $50 Meta (Llama) Model API credits | account at https://dev.meta.ai/ + intake form | alt `LLMProvider` (fallback) |
 | **Cognition / Devin** | $1000 Devin credits per team | Google form (see sheet), then booth | dev-time agent (not runtime) |
 | **Voloridge** | AWS CPU/GPU compute for their challenge | talk to Voloridge booth | compute (see note below) |
+| **Dropbox** | Challenge track (prizes: AirPods Max, fast-track interview) | build on it; no credit needed | `FileSourceProvider` |
+| **Deepgram** | $200 voice AI credits, no card | https://dpgr.am/hackmit26 | `SpeechProvider` (optional) |
 
 ## Useful, not core
 
 - **Mintlify** — 1 month Pro, code `MINTHACKMIT`. Option for hosting our docs.
 - **RunPod** — $15 credit codes at booth. GPU if we ever self-host embeddings.
-- **Deepgram** — $200 voice AI credits (https://dpgr.am/hackmit26). Only if we add audio.
 
 ## Corrections to earlier assumptions
 

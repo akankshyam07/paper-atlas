@@ -1586,6 +1586,14 @@ Full details and the interface↔sponsor mapping live in
   notes, artifacts, parsed PDFs; metadata filtering; canvas RAG. Indexes only
   application/user content and cached metadata. OpenAlex stays the scholarly
   source of truth; Elastic does not mirror it.
+- **Dropbox** → `FileSourceProvider`. Import user research PDFs from Dropbox
+  into the canvas through the existing upload/parse pipeline (UPLOADED_FILE
+  source entities). Directly answers the Dropbox challenge: turn fragmented
+  content into an organized, actionable research graph. SDK isolated in one
+  provider.
+- **Deepgram** → `SpeechProvider` (optional). Voice input to canvas chat
+  (speech-to-text) and read-aloud of AI summaries (text-to-speech). Kept off
+  the core research path.
 - **Voloridge** → compute, not a provider. Per the HackMIT credits sheet it
   offers AWS CPU/GPU compute for its challenge, not a data/analysis API, so it
   does not back `ResearchDataProvider`; OpenAlex is the sole implementation.

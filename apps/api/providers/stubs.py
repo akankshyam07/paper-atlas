@@ -28,3 +28,19 @@ class StubSearch:
 class PassthroughInferenceOptimizer:
     def optimize(self, prompt: str, **kw: Any) -> str:
         return prompt
+
+
+class StubFileSource:
+    def list_files(self, path: str = "") -> list[dict[str, Any]]:
+        return [{"id": "stub-1", "name": "example.pdf", "path": "/example.pdf"}]
+
+    def download(self, file_id: str) -> bytes:
+        return b"%PDF-1.4 stub"
+
+
+class StubSpeech:
+    def transcribe(self, audio: bytes, *, mime: str = "audio/wav") -> str:
+        return "[stub transcript]"
+
+    def synthesize(self, text: str) -> bytes:
+        return b"RIFF stub-audio"

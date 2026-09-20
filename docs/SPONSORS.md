@@ -19,6 +19,8 @@ implementation by setting the relevant env var and registering it.
 | `SearchProvider` | stub | **Elastic** | Hybrid keyword+semantic search over canvas objects, excerpts, notes, artifacts, parsed PDFs; metadata filtering; RAG retrieval |
 | `ResearchDataProvider` | OpenAlex | — | Scholarly discovery, citation traversal (OpenAlex only) |
 | `InferenceOptimizationProvider` | passthrough | — | Cost/latency/context optimization seam behind the AI gateway (no HackMIT sponsor offering) |
+| `FileSourceProvider` | stub | **Dropbox** | Import user files (PDFs) from Dropbox into the canvas via the upload pipeline |
+| `SpeechProvider` | stub | **Deepgram** | Optional voice input to canvas chat and read-aloud of AI summaries |
 
 ## Sponsor notes
 
@@ -43,6 +45,21 @@ the MVP). See [SPONSOR_CREDITS.md](./SPONSOR_CREDITS.md).
 gateway so an optimizer can be added later. Token Company (named in an earlier
 draft) is not a HackMIT 2026 sponsor and has no offering, so there is no sponsor
 implementation. Meta ($50 Llama API) is available as a fallback `LLMProvider`.
+
+### Dropbox — file source (challenge fit)
+Dropbox's challenge is turning fragmented content into something organized and
+actionable — which is what Paper Atlas does. Concrete integration:
+`FileSourceProvider` lets a user import research PDFs straight from Dropbox;
+they flow through the existing upload/parse pipeline and become UPLOADED_FILE
+source entities on the canvas. Dropbox SDK is isolated in
+`providers/dropbox_files.py`. This is a core-fit product feature, not a
+bolt-on.
+
+### Deepgram — optional voice layer
+Secondary fit. `SpeechProvider` adds voice input to the canvas chat bar
+(speech-to-text) and read-aloud of AI explanations (text-to-speech). Kept off
+the core research path so it never distorts the workflow. $200 credits
+available (see [SPONSOR_CREDITS.md](./SPONSOR_CREDITS.md)).
 
 ### Devin — development-time agent, NOT a runtime dependency
 Use for parallel implementation of isolated components, generating/testing
