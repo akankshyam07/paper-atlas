@@ -53,6 +53,7 @@ export function CanvasShell({ id }: { id: string }) {
   // Connector style for new links: straight line, one-sided curved arrow, or
   // two-sided. Applied to edges the user draws.
   const [connector, setConnector] = useState<"line" | "arrow" | "biarrow">("arrow");
+  const boardRef = useRef<HTMLDivElement>(null);
   const [lightboxId, setLightboxId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [palette, setPalette] = useState<{ open: boolean; query?: string }>({ open: false });
@@ -283,7 +284,11 @@ export function CanvasShell({ id }: { id: string }) {
 
   // ---- organize ----
   const groupSelection = useCallback(() => {
-    if (!doc || selected.length < 2) return;
+    if (!doc) return;
+    if (selected.length < 2) {
+      say("Select two or more objects to group them.");
+      return;
+    }
     const box = bbox(selected);
     const g = mkObject(doc.id, "NOTE", "Group", { kind: "group" }, box.x, box.y);
     update((d) => ({
@@ -293,7 +298,60 @@ export function CanvasShell({ id }: { id: string }) {
         ...d.nodes.map((n) => (selectedIds.has(n.id) ? { ...n, parentNode: g.id, extent: "parent" as const, position: { x: n.position.x - box.x, y: n.position.y - box.y }, selected: false } : n)),
       ],
     }));
-  }, [doc, selected, selectedIds, update]);
+  }, [doc, selected, selectedIds, update, say]);
+
+  // Compress: stack the selection into a pile of papers. Each card sits a few
+  // pixels down-right of the one above so the ones underneath peek out and it
+  // still reads as a group rather than one card. Ungrouped selections are
+  // grouped first, so compress always produces something you can move as a unit.
+  const compressSelection = useCallback(() => {
+    if (!doc) return;
+    if (selected.length < 2) {
+      say("Select two or more objects to compress them into a stack.");
+      return;
+    }
+    const box = bbox(selected);
+    const ids = selected.map((n) => n.id);
+    const existingParent = selected[0].parentNode;
+    const sameGroup = existingParent && selected.every((n) => n.parentNode === existingParent);
+
+    // Animate only for this move, so ordinary dragging stays 1:1 with the cursor.
+    boardRef.current?.classList.add("compressing");
+    window.setTimeout(() => boardRef.current?.classList.remove("compressing"), 420);
+
+    update((d) => {
+      let nodes = d.nodes;
+      let groupId = sameGroup ? existingParent : undefined;
+      let originX = box.x;
+      let originY = box.y;
+
+      if (!groupId) {
+        const g = mkObject(doc.id, "NOTE", "Stack", { kind: "group", collapsed: true }, box.x, box.y);
+        groupId = g.id;
+        originX = 0; originY = 0; // children are positioned relative to the group
+        nodes = [toNode("group", g, {}, { width: NODE_W + 60, height: 210 }), ...nodes];
+      }
+
+      const order = new Map(ids.map((id, i) => [id, i]));
+      return {
+        ...d,
+        nodes: nodes.map((n) => {
+          const i = order.get(n.id);
+          if (i === undefined) return n;
+          return {
+            ...n,
+            parentNode: groupId,
+            extent: "parent" as const,
+            selected: false,
+            zIndex: 10 + i,
+            className: `${n.className ?? ""} stacked`.trim(),
+            position: { x: originX + i * 7, y: originY + i * 5 },
+          };
+        }),
+      };
+    });
+    say(`Compressed ${ids.length} objects into a stack`);
+  }, [doc, selected, update, say]);
 
   const removeNodes = useCallback((ids: string[]) => {
     const rm = new Set(ids);
@@ -325,13 +383,14 @@ export function CanvasShell({ id }: { id: string }) {
         return;
       }
       case "group": return groupSelection();
+      case "compress": return compressSelection();
       case "duplicate": {
         const copy = { ...n.data.object, id: uid(), x: n.position.x + 40, y: n.position.y + 40 };
         return addLocal(n.type as NodeKind, copy, { paper: n.data.paper });
       }
       case "remove": return removeNodes([nid]);
     }
-  }, [byId, doc, recommend, showCitations, showStance, explain, chatAbout, selected, groupSelection, addLocal, removeNodes, update, say, fail]);
+  }, [byId, doc, recommend, showCitations, showStance, explain, chatAbout, selected, groupSelection, compressSelection, addLocal, removeNodes, update, say, fail]);
 
   // ---- chat ----
   const send = useCallback(async () => {
@@ -495,7 +554,7 @@ export function CanvasShell({ id }: { id: string }) {
             <button className="btn" aria-pressed={panelOpen} onClick={() => setPanelOpen(!panelOpen)} title="Toggle panel">▥</button>
           </header>
           <div className="work">
-            <div className="board" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); addFiles(e.dataTransfer.files, flow.screenToFlowPosition({ x: e.clientX, y: e.clientY })); }}>
+            <div className="board" ref={boardRef} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); addFiles(e.dataTransfer.files, flow.screenToFlowPosition({ x: e.clientX, y: e.clientY })); }}>
               <ReactFlow
                 nodes={nodes}
                 edges={edges}

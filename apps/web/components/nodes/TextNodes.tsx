@@ -1,7 +1,7 @@
 "use client";
 // Note (editable), Excerpt (quoted, keeps page + source), Thread (chat as a
 // node), PDF (upload card) and Group (frame) nodes.
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Handle, NodeResizer, Position, type NodeProps } from "reactflow";
 import type { NodeData } from "../../lib/store";
 import { useBoardActions } from "../canvas/actions";
@@ -66,9 +66,13 @@ export const ThreadNode = memo(function ThreadNode({ id, data }: NodeProps<NodeD
 
 export const PdfNode = memo(function PdfNode({ id, data }: NodeProps<NodeData>) {
   const a = useBoardActions();
-  const c = data.object.content as { filename?: string; origin?: string; pageCount?: number; pdfUrl?: string; abstract?: string; text?: string };
+  const c = data.object.content as { filename?: string; pageCount?: number; pdfUrl?: string; abstract?: string; text?: string };
   const src = a.pdfUrl(id) ?? c.pdfUrl;
   const body = String(c.abstract ?? c.text ?? "");
+  const pages = c.pageCount ?? 0;
+  const [page, setPage] = useState(1);
+  const go = (delta: number) => setPage((p) => Math.min(Math.max(1, p + delta), pages || Math.max(p + delta, 1)));
+
   return (
     <div className="node doc pdf">
       <QuickActions id={id} />
@@ -76,12 +80,21 @@ export const PdfNode = memo(function PdfNode({ id, data }: NodeProps<NodeData>) 
         <div className="eyebrow">PDF</div>
         <div className="node-title">{data.object.title ?? c.filename}</div>
       </div>
-      {/* Readable on the board: a cropped first page, or the text at 12px, so
-          the user does not have to expand just to see what this is. */}
       {src ? (
-        <div className="doc-crop"><iframe src={`${src}#view=FitH&toolbar=0&navpanes=0`} title={data.object.title ?? "PDF"} /></div>
+        <div className="doc-crop">
+          {/* The page fragment drives the embedded viewer, so paging does not
+              need the PDF to be re-fetched. */}
+          <iframe key={page} src={`${src}#page=${page}&view=FitH&toolbar=0&navpanes=0`} title={data.object.title ?? "PDF"} />
+        </div>
       ) : (
         <div className="doc-body">{body || "Open to read"}</div>
+      )}
+      {src && (
+        <div className="pager" role="group" aria-label="Page navigation">
+          <button onClick={() => go(-1)} disabled={page <= 1} aria-label="Previous page">‹</button>
+          <span className="pager-count">{page}{pages ? ` / ${pages}` : ""}</span>
+          <button onClick={() => go(1)} disabled={!!pages && page >= pages} aria-label="Next page">›</button>
+        </div>
       )}
       <Handles />
     </div>
