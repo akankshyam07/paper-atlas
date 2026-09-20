@@ -47,6 +47,9 @@ def build_prompt(*, text: str | None, work: dict[str, Any] | None, action: str =
 
 
 def explain(*, text: str | None, work: dict[str, Any] | None, action: str = "explain") -> str:
-    from providers.registry import get_llm
+    from providers.registry import get_inference_optimizer, get_llm
 
-    return get_llm().complete(build_prompt(text=text, work=work, action=action), system=SYSTEM)
+    # Optimize here, not inside a provider: this is the one place every LLM
+    # prompt is built, so the cost-saving layer covers all providers.
+    prompt = get_inference_optimizer().optimize(build_prompt(text=text, work=work, action=action))
+    return get_llm().complete(prompt, system=SYSTEM)

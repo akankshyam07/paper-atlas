@@ -45,7 +45,12 @@ def get_embedding() -> EmbeddingProvider:
 
 @lru_cache
 def get_search() -> SearchProvider:
-    # TODO: ElasticSearchProvider() when ELASTIC_URL is set.
+    if os.getenv("ELASTIC_URL"):
+        try:
+            from providers.elastic_search import ElasticSearchProvider
+            return ElasticSearchProvider()
+        except Exception:
+            pass
     return StubSearch()
 
 
@@ -57,15 +62,34 @@ def get_research_data() -> ResearchDataProvider:
 
 @lru_cache
 def get_inference_optimizer() -> InferenceOptimizationProvider:
-    # TODO: TokenCompanyOptimizer() (LLM cost saving) when its key is set.
+    # Always on: the local cache and collapse strategies cost nothing and need
+    # no key. The Token Company endpoint additionally kicks in when its key set.
+    if os.getenv("INFERENCE_OPTIMIZER", "token_company") != "off":
+        try:
+            from providers.token_company import TokenCompanyOptimizer
+            return TokenCompanyOptimizer()
+        except Exception:
+            pass
     return PassthroughInferenceOptimizer()
 
 
 @lru_cache
 def get_file_source() -> FileSourceProvider:
-    return StubFileSource()  # TODO: DropboxFileSource() when DROPBOX_TOKEN set
+    if os.getenv("DROPBOX_TOKEN") or os.getenv("DROPBOX_REFRESH_TOKEN"):
+        try:
+            from providers.dropbox_files import DropboxFileSource
+            return DropboxFileSource()
+        except Exception:
+            pass
+    return StubFileSource()
 
 
 @lru_cache
 def get_speech() -> SpeechProvider:
-    return StubSpeech()  # TODO: DeepgramSpeech() when DEEPGRAM_API_KEY set
+    if os.getenv("DEEPGRAM_API_KEY"):
+        try:
+            from providers.deepgram_speech import DeepgramSpeech
+            return DeepgramSpeech()
+        except Exception:
+            pass
+    return StubSpeech()

@@ -21,9 +21,8 @@ class OpenAILLM:
         self._model = model
 
     def complete(self, prompt: str, *, system: str | None = None, **kw: Any) -> str:
-        from providers.registry import get_inference_optimizer
-
-        prompt = get_inference_optimizer().optimize(prompt)
+        # Prompts arrive already optimized — see intel/explain.py, which applies
+        # the InferenceOptimizationProvider for every LLM provider, not just this one.
         messages: list[dict[str, str]] = []
         if system:
             messages.append({"role": "system", "content": system})

@@ -31,3 +31,18 @@ app.include_router(speech_router)
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/inference/stats")
+def inference_stats() -> dict[str, object]:
+    """LLM token savings from the inference optimizer (Token Company challenge).
+    Reports what the optimization layer actually saved this process."""
+    from providers.registry import get_llm, get_inference_optimizer
+
+    optimizer = get_inference_optimizer()
+    stats = optimizer.stats() if hasattr(optimizer, "stats") else {}
+    return {
+        "optimizer": type(optimizer).__name__,
+        "llm": type(get_llm()).__name__,
+        **stats,
+    }
