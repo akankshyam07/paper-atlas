@@ -465,3 +465,35 @@ a:hover { color: var(--accent-hover); }
 /* Partial speech shows above the field in grey until it is committed. */
 .chat-partial { position: absolute; left: 20px; right: 56px; bottom: calc(100% + 6px);
   font-size: 12.5px; color: var(--ink-5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Thumbnails reflect the real board, so cards are distinguishable. */
+.card .thumb i.warm { background: #f2d98c; }
+
+/* Error / empty routes */
+.errpage { height: 100vh; display: grid; place-items: center; text-align: center; padding: 24px; }
+.errpage h1 { font-size: 20px; margin: 0 0 6px; }
+.errpage p { color: var(--ink-4); font-size: 13px; margin: 0 0 18px; }
+.errpage .btn { text-decoration: none; display: inline-block; }
+
+/* Zoom belongs to the canvas: pinch and trackpad zoom elsewhere just scrolls
+   the browser, which made panels drift out of place. */
+.home, .rail, .panel, .topbar { touch-action: pan-y; overscroll-behavior: contain; }
+
+/* Tooltip on the toolbar, so an icon never has to carry the meaning alone. */
+.tools .tool { position: relative; }
+.tools .tool::after { content: attr(title); position: absolute; left: calc(100% + 10px); top: 50%;
+  transform: translateY(-50%); white-space: nowrap; background: var(--ink); color: #fff;
+  font-size: 11px; padding: 4px 8px; border-radius: 6px; opacity: 0; pointer-events: none;
+  transition: opacity 0.1s ease 0.25s; z-index: 40; }
+.tools .tool:hover::after { opacity: 1; }
+
+/* Concept links inside paper text (PRD §11) */
+.concept { display: inline; padding: 0; border: 0; background: none; font: inherit;
+  color: var(--accent); cursor: pointer; text-decoration: underline;
+  text-decoration-color: var(--accent-line); text-underline-offset: 2px; }
+.concept:hover { text-decoration-color: var(--accent); }
+.concept-card { position: absolute; left: 14px; right: 14px; bottom: 74px; padding: 12px 14px; z-index: 20; }
+.concept-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.concept-head b { flex: 1; font-size: 13px; }
+.concept-card p { margin: 0 0 10px; font-size: 12px; line-height: 1.5; color: var(--ink-3); }
+.concept-card a.chip { text-decoration: none; }

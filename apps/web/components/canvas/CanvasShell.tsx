@@ -563,6 +563,8 @@ export function CanvasShell({ id }: { id: string }) {
         case "ask": setDraft(sel.text); setTab("Chat"); return;
         case "related": setPalette({ open: true, query: sel.text.slice(0, 120) }); return;
         case "supporting": case "contradicting": return showStance(sel.objectId, a);
+        // A concept is only added when the user asks — never automatically (PRD §11).
+        case "wiki": return addEmbed(`https://en.wikipedia.org/wiki/${encodeURIComponent(sel.text.replace(/\s+/g, "_"))}`);
       }
     } catch (e) { fail("Action")(e); }
   }, [addExcerpt, addNote, explain, say, fail]);
@@ -676,9 +678,9 @@ export function CanvasShell({ id }: { id: string }) {
                 </div>
                 <button className="tool" title="Group selection (⌘G)" onClick={groupSelection}><GroupIcon /></button>
                 <span className="tool-sep" />
-                <button className={`tool${connector === "line" ? " on" : ""}`} title="Line connector" aria-pressed={connector === "line"} onClick={() => setConnector("line")}><LineIcon /></button>
-                <button className={`tool${connector === "arrow" ? " on" : ""}`} title="Curved arrow" aria-pressed={connector === "arrow"} onClick={() => setConnector("arrow")}><ArrowIcon /></button>
-                <button className={`tool${connector === "biarrow" ? " on" : ""}`} title="Curved arrow, both ends" aria-pressed={connector === "biarrow"} onClick={() => setConnector("biarrow")}><BiArrowIcon /></button>
+                <button className={`tool${connector === "line" ? " on" : ""}`} title="Connector: straight line" aria-pressed={connector === "line"} onClick={() => setConnector("line")}><LineIcon /></button>
+                <button className={`tool${connector === "arrow" ? " on" : ""}`} title="Connector: arrow (one direction)" aria-pressed={connector === "arrow"} onClick={() => setConnector("arrow")}><ArrowIcon /></button>
+                <button className={`tool${connector === "biarrow" ? " on" : ""}`} title="Connector: arrow (both directions)" aria-pressed={connector === "biarrow"} onClick={() => setConnector("biarrow")}><BiArrowIcon /></button>
                 <span className="tool-sep" />
                 <button className="tool accent" title="Ask AI" onClick={() => { setPanelOpen(true); setTab("Chat"); }}><SparkIcon /></button>
               </div>

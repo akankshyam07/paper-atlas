@@ -3,14 +3,14 @@
 // selection menu (2g). Selecting text anywhere in the body shows
 // Capture / AI / Research actions; the selection's source object + offsets
 // travel with the action so excerpts keep provenance.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api } from "../../lib/api";
 import type { PaperPreview } from "@atlas/types";
 import type { Node } from "reactflow";
 import type { NodeData } from "../../lib/store";
 
 export type Selection = { text: string; objectId: string; start: number; end: number };
-export type SelectionAction = "highlight" | "note" | "explain" | "summarize" | "ask" | "related" | "supporting" | "contradicting";
+export type SelectionAction = "highlight" | "note" | "explain" | "summarize" | "ask" | "related" | "supporting" | "contradicting" | "wiki";
 
 const TABS = ["Abstract", "References", "Cited by", "Topics"] as const;
 
@@ -23,6 +23,9 @@ export function Viewer({ node, edges, pdfUrl, onSelectionAction, onAction }: {
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Abstract");
   const [cites, setCites] = useState<{ loading: boolean; items: PaperPreview[] }>({ loading: false, items: [] });
+  type Span = { term: string; start: number; end: number; title: string; url: string };
+  const [spans, setSpans] = useState<Span[]>([]);
+  const [preview, setPreview] = useState<{ title: string; extract: string; url: string } | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; sel: Selection } | null>(null);
   const o = node.data.object;
   const p = node.data.paper;
@@ -40,6 +43,43 @@ export function Viewer({ node, edges, pdfUrl, onSelectionAction, onAction }: {
       .catch(() => { if (!cancelled) setCites({ loading: false, items: [] }); });
     return () => { cancelled = true; };
   }, [tab, o.id, p]);
+
+  // Concept links (PRD §11): resolved server-side from the work's own keywords,
+  // so only meaningful technical phrases become links — not every noun.
+  useEffect(() => {
+    if (!body) { setSpans([]); return; }
+    let cancelled = false;
+    api.concepts(o.id)
+      .then((r) => { if (!cancelled) setSpans(r.spans ?? []); })
+      .catch(() => { if (!cancelled) setSpans([]); });
+    return () => { cancelled = true; };
+  }, [o.id, body]);
+
+  const openConcept = useCallback((title: string) => {
+    setPreview({ title, extract: "Loading…", url: "" });
+    api.conceptSummary(title).then(setPreview).catch(() => setPreview(null));
+  }, []);
+
+  // Split the text around the resolved spans, leaving the prose intact.
+  const withConcepts = useCallback((para: string, offset: number) => {
+    const hits = spans.filter((sp) => sp.start >= offset && sp.end <= offset + para.length);
+    if (!hits.length) return para;
+    const out: ReactNode[] = [];
+    let cursor = 0;
+    for (const sp of hits) {
+      const s0 = sp.start - offset, e0 = sp.end - offset;
+      if (s0 < cursor) continue;
+      out.push(para.slice(cursor, s0));
+      out.push(
+        <button key={`${sp.start}-${sp.title}`} className="concept" onClick={() => openConcept(sp.title)} title={`Wikipedia: ${sp.title}`}>
+          {para.slice(s0, e0)}
+        </button>,
+      );
+      cursor = e0;
+    }
+    out.push(para.slice(cursor));
+    return out;
+  }, [spans, openConcept]);
 
   const onMouseUp = useCallback(() => {
     const s = window.getSelection();
@@ -110,7 +150,16 @@ export function Viewer({ node, edges, pdfUrl, onSelectionAction, onAction }: {
               </ul>
             )
         ) : body ? (
-          <div className="viewer-body">{body.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}</div>
+          <div className="viewer-body">
+            {(() => {
+              let off = 0;
+              return body.split(/\n{2,}/).map((para, i) => {
+                const start = off;
+                off += para.length + 2;
+                return <p key={i}>{withConcepts(para, start)}</p>;
+              });
+            })()}
+          </div>
         ) : (
           <div className="empty">{p ? "Abstract not available — metadata only." : "Nothing to read here."}</div>
         )}
@@ -129,6 +178,19 @@ export function Viewer({ node, edges, pdfUrl, onSelectionAction, onAction }: {
         <button className="btn" onClick={() => onAction("explain")}>Explain</button>
         <button className="btn primary" onClick={() => onAction("chat")}>Chat about this</button>
       </div>
+      {preview && (
+        <div className="concept-card popover" onMouseDown={(e) => e.stopPropagation()}>
+          <div className="concept-head">
+            <b>{preview.title}</b>
+            <button className="btn" onClick={() => setPreview(null)} aria-label="Close">✕</button>
+          </div>
+          <p>{preview.extract}</p>
+          <div className="group">
+            {preview.url && <a className="chip click" href={preview.url} target="_blank" rel="noreferrer">Read on Wikipedia</a>}
+            <button className="chip click solid" onClick={() => { onSelectionAction("wiki", { text: preview.title, objectId: o.id, start: 0, end: 0 }); setPreview(null); }}>Add to canvas</button>
+          </div>
+        </div>
+      )}
       {menu && (
         <div className="selmenu popover" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.preventDefault()}>
           <div className="eyebrow">Capture</div>

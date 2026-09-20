@@ -25,8 +25,8 @@ async function post<TReq, TRes>(path: string, body: TReq): Promise<TRes> {
 }
 
 export const api = {
-  search: (q: string): Promise<SearchResponse> =>
-    fetch(`${BASE}/search?q=${encodeURIComponent(q)}`).then((r) => r.json()),
+  search: (q: string, limit = 10): Promise<SearchResponse> =>
+    fetch(`${BASE}/search?q=${encodeURIComponent(q)}&limit=${limit}`).then((r) => r.json()),
   addObject: (req: AddObjectRequest): Promise<AddObjectResponse> =>
     post("/objects", req),
   addEdge: (req: AddEdgeRequest): Promise<AddEdgeResponse> =>
@@ -38,6 +38,10 @@ export const api = {
   citations: (objectId: string, direction: CitationDirection, limit = 25): Promise<SearchResponse> =>
     fetch(`${BASE}/citations?objectId=${encodeURIComponent(objectId)}&direction=${direction}&limit=${limit}`).then((r) => r.json()),
   embed: (req: { canvasId: string; url: string; title?: string; x?: number; y?: number }): Promise<{ object: CanvasObject }> => post("/embed", req),
+  concepts: (objectId: string): Promise<{ spans: { term: string; start: number; end: number; title: string; url: string }[] }> =>
+    fetch(`${BASE}/concepts?objectId=${encodeURIComponent(objectId)}`).then((r) => r.json()),
+  conceptSummary: (title: string): Promise<{ title: string; extract: string; url: string; thumbnail?: string }> =>
+    fetch(`${BASE}/concepts/summary?title=${encodeURIComponent(title)}`).then((r) => r.json()),
   chat: (req: ChatRequest): Promise<ChatResponse> => post("/chat", req),
   stance: (req: StanceRequest): Promise<RecResponse> => post("/stance", req),
   suppress: (req: SuppressRequest): Promise<unknown> => post("/suppressions", req),

@@ -3,7 +3,7 @@
 // rename/delete menu, "+ New canvas" card.
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { createCanvas, deleteCanvas, listCanvases, renameCanvas, type CanvasMeta } from "../lib/store";
+import { createCanvas, deleteCanvas, listCanvases, loadCanvas, renameCanvas, type CanvasMeta } from "../lib/store";
 
 const VIEWS = ["All canvases", "Recent"] as const;
 
@@ -14,6 +14,37 @@ function ago(t: number) {
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   if (s < 604800) return `${Math.floor(s / 86400)}d ago`;
   return `${Math.floor(s / 604800)}w ago`;
+}
+
+// A card shows where the objects actually are, so two canvases do not look
+// identical. Positions are normalised into the thumbnail box.
+function Thumb({ id }: { id: string }) {
+  const doc = loadCanvas(id);
+  const nodes = (doc?.nodes ?? []).filter((n) => n.type !== "suggestion").slice(0, 40);
+  if (!nodes.length) return <div className="thumb" aria-hidden />;
+
+  const xs = nodes.map((n) => n.position.x);
+  const ys = nodes.map((n) => n.position.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const w = Math.max(maxX - minX, 1), h = Math.max(maxY - minY, 1);
+
+  return (
+    <div className="thumb" aria-hidden>
+      {nodes.map((n) => (
+        <i
+          key={n.id}
+          className={n.type === "ai" ? "accent" : n.type === "note" ? "warm" : undefined}
+          style={{
+            left: `${8 + ((n.position.x - minX) / w) * 78}%`,
+            top: `${10 + ((n.position.y - minY) / h) * 70}%`,
+            width: n.type === "paper" || n.type === "pdf" ? 18 : 11,
+            height: n.type === "paper" || n.type === "pdf" ? 13 : 8,
+          }}
+        />
+      ))}
+    </div>
+  );
 }
 
 export function Home() {
@@ -64,11 +95,7 @@ export function Home() {
         <div className="cards">
           {shown.map((c) => (
             <div key={c.id} className="card" role="link" tabIndex={0} onClick={() => router.push(`/c/${c.id}`)} onKeyDown={(e) => e.key === "Enter" && router.push(`/c/${c.id}`)}>
-              <div className="thumb" aria-hidden>
-                <i style={{ left: 14, top: 14, width: 44, height: 22 }} />
-                <i className="accent" style={{ left: 22, top: 44, width: 16, height: 10 }} />
-                <i style={{ left: 50, top: 42, width: 28, height: 14 }} />
-              </div>
+              <Thumb id={c.id} />
               <div className="body">
                 <div className="name">{c.title}</div>
                 <div className="sub">{c.objectCount} object{c.objectCount === 1 ? "" : "s"} · {ago(c.updatedAt)}</div>

@@ -137,3 +137,22 @@ class EmbedRequest(BaseModel):
 
 class EmbedResponse(BaseModel):
     object: CanvasObject
+
+
+class ConceptSpan(BaseModel):
+    term: str
+    start: int
+    end: int
+    title: str
+    url: str
+
+
+class ConceptsResponse(BaseModel):
+    spans: list[ConceptSpan]
+
+
+class WikiSummary(BaseModel):
+    title: str
+    extract: str
+    url: str
+    thumbnail: str | None = None

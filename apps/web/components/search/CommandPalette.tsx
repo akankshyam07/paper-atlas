@@ -1,6 +1,6 @@
 "use client";
 // ⌘K palette (wireframes 2b / 2k): canvas search, OpenAlex search → Add, actions.
-// Results are previews — nothing lands on the board until you add it (PRD §18).
+// Previews — nothing lands on the board until you add it (PRD §18).
 import { useEffect, useRef, useState } from "react";
 import type { PaperPreview } from "@atlas/types";
 import { api } from "../../lib/api";
@@ -23,6 +23,7 @@ export function CommandPalette({ nodes, actions, onFocusNode, onAdd, onClose, in
   const [oaOnly, setOaOnly] = useState(false);
   const [recent, setRecent] = useState(false);
   const [adding, setAdding] = useState<string | null>(null);
+  const [limit, setLimit] = useState(10);
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => { input.current?.focus(); }, []);
@@ -32,16 +33,31 @@ export function CommandPalette({ nodes, actions, onFocusNode, onAdd, onClose, in
     return () => document.removeEventListener("keydown", esc);
   }, [onClose]);
 
-  // debounced OpenAlex search
+  // Debounced OpenAlex search.
+  //
+  // Two things kept half-relevant papers flashing in front of the user: the
+  // debounce fired while they were still typing, and a slow early request could
+  // land after a fast later one and overwrite good results with stale ones.
+  // The sequence guard drops any response that is not the newest request, and
+  // previous results stay on screen while the next query runs rather than
+  // clearing to an empty list.
+  const seq = useRef(0);
   useEffect(() => {
     const term = q.trim();
-    if (term.length < 2) { setResults([]); setState("idle"); return; }
+    if (term.length < 2) { setResults([]); setState("idle"); seq.current++; return; }
     setState("loading");
+    const mine = ++seq.current;
     const t = setTimeout(() => {
-      api.search(term).then((r) => { setResults(r.results); setState("idle"); }).catch(() => setState("error"));
-    }, 250);
+      api.search(term, limit)
+        .then((r) => {
+          if (mine !== seq.current) return; // a newer query has already been issued
+          setResults(r.results);
+          setState("idle");
+        })
+        .catch(() => { if (mine === seq.current) setState("error"); });
+    }, 420);
     return () => clearTimeout(t);
-  }, [q]);
+  }, [q, limit]);
 
   const term = q.trim().toLowerCase();
   const local = term ? nodes.filter((n) => n.type !== "suggestion" && (n.data.object.title ?? "").toLowerCase().includes(term)).slice(0, 5) : [];
@@ -111,7 +127,10 @@ export function CommandPalette({ nodes, actions, onFocusNode, onAdd, onClose, in
             </>
           )}
         </div>
-        <div className="palette-foot">Results are previews — nothing lands on the board until you add it</div>
+        <div className="palette-foot">
+          {remote.length >= limit && state !== "loading" && (
+            <button className="chip click" onClick={() => setLimit((n) => n + 10)}>Show more</button>
+          )}Previews — nothing lands on the board until you add it</div>
       </div>
     </div>
   );
