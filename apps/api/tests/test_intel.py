@@ -125,6 +125,23 @@ def test_pdf_url_prefers_any_oa_pdf_then_arxiv_and_never_a_landing_page():
         "best_oa_location": {"landing_page_url": "https://arxiv.org/abs/1706.03762v5"},
     }) == "https://arxiv.org/pdf/1706.03762"
 
+    # arXiv wins over best_oa_location. This is the real record for "Attention
+    # Is All You Need": OpenAlex names a dead .cn mirror as the best location
+    # and lists the live arXiv copy further down.
+    assert mapping.pdf_url({
+        "best_oa_location": {"pdf_url": "https://langtaosha.org.cn/index.php/lts/preprint/download/10/108"},
+        "locations": [
+            {"pdf_url": "https://langtaosha.org.cn/index.php/lts/preprint/download/10/108"},
+            {"pdf_url": "https://arxiv.org/pdf/1706.03762", "landing_page_url": "http://arxiv.org/abs/1706.03762"},
+        ],
+    }) == "https://arxiv.org/pdf/1706.03762"
+
+    # With no arXiv copy the best location is still used, dead or not: the node
+    # falls back to its abstract if it will not load.
+    assert mapping.pdf_url({
+        "best_oa_location": {"pdf_url": "https://elsewhere.example/x.pdf"},
+    }) == "https://elsewhere.example/x.pdf"
+
     # An HTML landing page is worse than nothing: the node shows the abstract.
     assert mapping.pdf_url({
         "open_access": {"oa_url": "https://journal.example.org/article/view/42"},

@@ -64,20 +64,30 @@ def _arxiv_pdf(url: str | None) -> str | None:
 
 
 def pdf_url(work: dict[str, Any]) -> str | None:
-    """Priority per PRD §12: any OA location's pdf -> arXiv landing page -> an
-    oa_url that is itself a PDF.
+    """Pick the PDF most likely to actually load (PRD §12).
 
-    A landing page is deliberately NOT returned: the viewer cannot render HTML,
-    so the node would show a broken preview where the abstract belongs.
+    arXiv is preferred over everything, including `best_oa_location`: OpenAlex
+    regularly names a predatory mirror as the best location while the live arXiv
+    copy sits further down `locations`. "Attention Is All You Need" is the
+    standing example — its best_oa_location is a dead .cn preprint mirror.
+
+    A landing page is never returned. The viewer cannot render HTML, so the node
+    would show a broken preview where its abstract belongs.
     """
-    locs = [work.get("best_oa_location"), work.get("primary_location"), *(work.get("locations") or [])]
+    locs = [loc for loc in (
+        work.get("best_oa_location"),
+        work.get("primary_location"),
+        *(work.get("locations") or []),
+    ) if loc]
+
     for loc in locs:
-        if loc and loc.get("pdf_url"):
-            return loc["pdf_url"]
-    for loc in locs:
-        arx = _arxiv_pdf((loc or {}).get("landing_page_url"))
+        arx = _arxiv_pdf(loc.get("pdf_url")) or _arxiv_pdf(loc.get("landing_page_url"))
         if arx:
             return arx
+    for loc in locs:
+        if loc.get("pdf_url"):
+            return loc["pdf_url"]
+
     oa = (work.get("open_access") or {}).get("oa_url")
     return _arxiv_pdf(oa) or (oa if (oa or "").lower().endswith(".pdf") else None)
 
