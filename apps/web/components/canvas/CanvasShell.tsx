@@ -15,6 +15,7 @@ import { bbox, fanOut, NODE_H, NODE_W } from "../../lib/layout";
 import { isSuppressed, uid, useCanvasDoc, type ChatMessage, type EdgeData, type NodeData, type NodeKind } from "../../lib/store";
 import { Sidebar } from "../Sidebar";
 import { BoardActionsContext, type BoardActions } from "./actions";
+import { Help } from "./Help";
 import { Lightbox } from "../panel/Lightbox";
 import { EmptyState } from "./EmptyState";
 import { PaperNode } from "../nodes/PaperNode";
@@ -71,6 +72,7 @@ export function CanvasShell({ id }: { id: string }) {
   // two-sided. Applied to edges the user draws.
   const [connector, setConnector] = useState<"line" | "arrow" | "biarrow">("arrow");
   const boardRef = useRef<HTMLDivElement>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [lightboxId, setLightboxId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -101,6 +103,17 @@ export function CanvasShell({ id }: { id: string }) {
     else if (doc.nodes.length) setTimeout(() => flow.fitView({ padding: 0.3 }), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc?.id]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      // Never hijack "?" while the user is writing a note or a question.
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (e.key === "?") { e.preventDefault(); setHelpOpen(true); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   const onMoveEnd = useCallback((_: unknown, vp: Viewport) => { setZoom(vp.zoom); update((d) => ({ ...d, viewport: vp }), false); }, [update]);
   const focusNode = useCallback((nid: string) => {
     flow.fitView({ nodes: [{ id: nid }], duration: 400, maxZoom: 1.2, padding: 0.5 });
@@ -563,6 +576,7 @@ export function CanvasShell({ id }: { id: string }) {
   const paletteActions = useMemo<PaletteAction[]>(() => [
     { id: "upload", label: "Upload file", run: () => fileInput.current?.click() },
     { id: "note", label: "New note", run: () => addNote().catch(fail("Note")) },
+    { id: "help", label: "Help — what everything does", run: () => setHelpOpen(true) },
     { id: "fit", label: "Fit canvas", run: () => flow.fitView({ padding: 0.2, duration: 300 }) },
   ], [addNote, fail, flow]);
 
@@ -647,12 +661,14 @@ export function CanvasShell({ id }: { id: string }) {
                 </div>
                 <button className="tool accent" title="Ask AI" onClick={() => { setPanelOpen(true); setTab("Chat"); }}>✦</button>
               </div>
+              <button className="help-fab" title="Help — what everything does (?)" aria-label="Help" onClick={() => setHelpOpen(true)}>?</button>
               {real.length === 0 && <EmptyState onSearch={() => setPalette({ open: true })} onUpload={() => fileInput.current?.click()} onDrop={addFiles} />}
               <form className="chatbar" onSubmit={(e) => { e.preventDefault(); setPanelOpen(true); setTab("Chat"); send(); }}>
                 <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask anything" aria-label="Ask about this canvas" onFocus={() => { setPanelOpen(true); setTab("Chat"); }} />
                 <button type="button" aria-pressed={recording} onClick={toggleMic} title="Voice input">🎙</button>
               </form>
             </div>
+            {helpOpen && <Help onClose={() => setHelpOpen(false)} />}
             {lightboxId && byId(lightboxId) && (
               <Lightbox node={byId(lightboxId)!} pdfUrl={actions.pdfUrl(lightboxId)} onClose={() => setLightboxId(null)} />
             )}
