@@ -1586,12 +1586,12 @@ Full details and the interface↔sponsor mapping live in
   notes, artifacts, parsed PDFs; metadata filtering; canvas RAG. Indexes only
   application/user content and cached metadata. OpenAlex stays the scholarly
   source of truth; Elastic does not mirror it.
-- **Voloridge** → `ResearchDataProvider` (OpenAlex is the default). Structured
-  extraction across literature, relationship/pattern detection, high-signal
-  ranking from large candidate sets. Integrate only where it strengthens
-  discovery, gated on a real challenge/API.
-- **Token Company** → `InferenceOptimizationProvider`, behind the AI/model
-  gateway. Reduce inference cost/latency, compress long-document context.
+- **Voloridge** → compute, not a provider. Per the HackMIT credits sheet it
+  offers AWS CPU/GPU compute for its challenge, not a data/analysis API, so it
+  does not back `ResearchDataProvider`; OpenAlex is the sole implementation.
+- **Inference optimization** → `InferenceOptimizationProvider` is a passthrough
+  seam only. Token Company (named earlier) is not a HackMIT 2026 sponsor and has
+  no offering. **Meta** ($50 Llama API) is available as a fallback `LLMProvider`.
 - **Devin** → development-time agent only (parallel component implementation,
   API/test generation, scoped fixes, deploy/repo maintenance). The shipped
   product must run without Devin — it is not a runtime dependency.

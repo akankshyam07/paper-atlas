@@ -32,3 +32,7 @@ coverage/
 .pytest_cache/
 playwright-report/
 test-results/
+
+# Next.js build artifacts
+apps/web/next-env.d.ts
+apps/web/tsconfig.tsbuildinfo

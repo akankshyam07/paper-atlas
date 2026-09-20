@@ -17,8 +17,8 @@ implementation by setting the relevant env var and registering it.
 | `LLMProvider` | stub | **OpenAI** | Explanations, summaries, tool calling, Broader/Deeper classification, supporting/contradicting analysis, artifact generation |
 | `EmbeddingProvider` | stub | **OpenAI** | Embeddings for user/canvas-local content only (not all of OpenAlex) |
 | `SearchProvider` | stub | **Elastic** | Hybrid keyword+semantic search over canvas objects, excerpts, notes, artifacts, parsed PDFs; metadata filtering; RAG retrieval |
-| `ResearchDataProvider` | OpenAlex | **Voloridge** | Scholarly discovery, citation traversal; Voloridge for structured extraction / cross-paper pattern analysis / high-signal ranking |
-| `InferenceOptimizationProvider` | passthrough | **Token Company** | Cost/latency reduction, context compression, routing around long documents — sits behind the AI gateway |
+| `ResearchDataProvider` | OpenAlex | — | Scholarly discovery, citation traversal (OpenAlex only) |
+| `InferenceOptimizationProvider` | passthrough | — | Cost/latency/context optimization seam behind the AI gateway (no HackMIT sponsor offering) |
 
 ## Sponsor notes
 
@@ -31,16 +31,18 @@ classification/reranking.
 Indexes only application/user-relevant content and cached metadata. OpenAlex
 remains the external scholarly source of truth; Elastic does not mirror it.
 
-### Voloridge — research/analysis layer
-Fits structured extraction across literature, relationship/pattern detection,
-evidence-driven workflows, and ranking high-signal sources from large candidate
-sets. Integrate only where it strengthens discovery — behind
-`ResearchDataProvider`, not as a disconnected feature. Gate on a real
-challenge/API being provided.
+### Voloridge — compute, not a data provider
+Per the HackMIT credits sheet, Voloridge provides AWS CPU/GPU compute for teams
+on its challenge, not a scholarly-data or analysis API. It does NOT back
+`ResearchDataProvider`; OpenAlex is the sole implementation. Consider Voloridge
+only if we run heavy local processing/ML and want their compute (not needed for
+the MVP). See [SPONSOR_CREDITS.md](./SPONSOR_CREDITS.md).
 
-### Token Company — inference optimization
-Behind the AI/model gateway (`InferenceOptimizationProvider`). Keeps the app
-decoupled from a single inference provider.
+### Inference optimization — interface only
+`InferenceOptimizationProvider` stays as a passthrough seam behind the AI
+gateway so an optimizer can be added later. Token Company (named in an earlier
+draft) is not a HackMIT 2026 sponsor and has no offering, so there is no sponsor
+implementation. Meta ($50 Llama API) is available as a fallback `LLMProvider`.
 
 ### Devin — development-time agent, NOT a runtime dependency
 Use for parallel implementation of isolated components, generating/testing
