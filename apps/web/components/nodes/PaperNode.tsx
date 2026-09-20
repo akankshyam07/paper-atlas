@@ -28,10 +28,12 @@ const pageSrc = (src: string, page: number, fit: "Fit" | "FitH") =>
   `${src}${src.includes("?") ? "&" : "?"}pane=${page}#page=${page}&view=${fit}&toolbar=0&navpanes=0&scrollbar=0`;
 
 export const PaperNode = memo(function PaperNode({ id, data }: NodeProps<NodeData>) {
+  const a = useBoardActions();
   const p = data.paper;
   const c = data.object.content as {
     pdfUrl?: string; abstract?: string; year?: number; venue?: string;
     authors?: string[]; type?: string; pageCount?: number;
+    tucked?: { id: string; x: number; y: number }[];
   };
   const src = viaProxy(c.pdfUrl);
   const isBook = (c.type ?? "").includes("book");
@@ -58,6 +60,15 @@ export const PaperNode = memo(function PaperNode({ id, data }: NodeProps<NodeDat
     <div className={`node sheet${isBook ? " book" : ""}${reading ? " reading" : ""}`}
       title={reading ? "Reading — scroll the document" : "Right-click for Broader, Deeper and more"}>
       <QuickActions id={id} />
+      {/* Tucked notes ride on the paper's edge like a sticky pad — visible
+          enough to remember they exist, small enough not to bury the board. */}
+      {!!c.tucked?.length && (
+        <button className="stickypad nodrag" onClick={() => a.tuck(id)}
+          title={`${c.tucked.length} note${c.tucked.length === 1 ? "" : "s"} tucked — click to release`}>
+          {c.tucked.slice(0, 3).map((t, i) => <span key={t.id} className={`pad pad-${i}`} />)}
+          <span className="pad-count">{c.tucked.length}</span>
+        </button>
+      )}
       <div className={`sheet-stage${isBook ? " spread" : ""} flip-${flip}`}>
         {src ? (
           isBook ? (

@@ -455,6 +455,57 @@ export function CanvasShell({ id }: { id: string }) {
     await addEmbed(url);
   }, [addEmbed]);
 
+  // Tuck: notes, excerpts and AI artifacts derived from a paper fold into a
+  // sticky pad on its edge, so annotating a paper heavily does not bury the
+  // board. Their positions are remembered, so releasing puts them back exactly
+  // where they were rather than re-laying them out.
+  const tuckNotes = useCallback((paperId: string) => {
+    if (!doc) return;
+    const paper = byId(paperId);
+    if (!paper) return;
+
+    const attachedIds = new Set<string>();
+    for (const e of doc.edges) {
+      if (e.source === paperId) attachedIds.add(e.target);
+      if (e.target === paperId) attachedIds.add(e.source);
+    }
+    const tuckable = doc.nodes.filter(
+      (n) => attachedIds.has(n.id) && ["note", "excerpt", "ai"].includes(n.type ?? ""),
+    );
+    const already = (paper.data.object.content.tucked as { id: string; x: number; y: number }[] | undefined) ?? [];
+
+    if (already.length) {
+      // Release: restore each note to where it was before it was tucked.
+      const home = new Map(already.map((t) => [t.id, t]));
+      update((d) => ({
+        ...d,
+        nodes: d.nodes.map((n) => {
+          if (n.id === paperId) {
+            const { tucked: _drop, ...rest } = n.data.object.content as Record<string, unknown>;
+            return { ...n, data: { ...n.data, object: { ...n.data.object, content: rest } } };
+          }
+          const h = home.get(n.id);
+          return h ? { ...n, hidden: false, position: { x: h.x, y: h.y } } : n;
+        }),
+      }));
+      return say(`Released ${already.length} note${already.length === 1 ? "" : "s"}`);
+    }
+
+    if (!tuckable.length) return say("Nothing attached to this paper yet — add a note or an explanation first.");
+
+    const remembered = tuckable.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y }));
+    update((d) => ({
+      ...d,
+      nodes: d.nodes.map((n) => {
+        if (n.id === paperId) {
+          return { ...n, data: { ...n.data, object: { ...n.data.object, content: { ...n.data.object.content, tucked: remembered } } } };
+        }
+        return remembered.some((t) => t.id === n.id) ? { ...n, hidden: true } : n;
+      }),
+    }));
+    say(`Tucked ${tuckable.length} note${tuckable.length === 1 ? "" : "s"} into the paper`);
+  }, [doc, byId, update, say]);
+
   const removeNodes = useCallback((ids: string[]) => {
     const rm = new Set(ids);
     update((d) => ({ ...d, nodes: d.nodes.filter((n) => !rm.has(n.id) && !(n.parentNode && rm.has(n.parentNode))), edges: d.edges.filter((e) => !rm.has(e.source) && !rm.has(e.target)) }));
@@ -486,13 +537,14 @@ export function CanvasShell({ id }: { id: string }) {
       }
       case "group": return groupSelection();
       case "compress": return compressSelection();
+      case "tuck": return tuckNotes(nid);
       case "duplicate": {
         const copy = { ...n.data.object, id: uid(), x: n.position.x + 40, y: n.position.y + 40 };
         return addLocal(n.type as NodeKind, copy, { paper: n.data.paper });
       }
       case "remove": return removeNodes([nid]);
     }
-  }, [byId, doc, recommend, showCitations, showStance, explain, chatAbout, selected, groupSelection, compressSelection, addLocal, removeNodes, update, say, fail]);
+  }, [byId, doc, recommend, showCitations, showStance, explain, chatAbout, selected, groupSelection, compressSelection, tuckNotes, addLocal, removeNodes, update, say, fail]);
 
   // ---- chat ----
   const send = useCallback(async () => {
@@ -627,6 +679,7 @@ export function CanvasShell({ id }: { id: string }) {
 
   const actions = useMemo<BoardActions>(() => ({
     open: (nid) => { setDetailId(nid); setTab("Details"); setPanelOpen(true); },
+    tuck: (nid) => tuckNotes(nid),
     pdfUrl: (nid) => pdfBlobs.get(nid) ?? (byId(nid)?.data.object.content.pdfUrl as string | undefined),
     chatAbout,
     menu: (nid, x, y) => setMenu({ id: nid, x, y }),

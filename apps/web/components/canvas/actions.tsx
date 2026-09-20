@@ -14,11 +14,12 @@ export type BoardActions = {
   readAloud: (text: string) => void;
   editText: (nodeId: string, text: string) => void; // inline note editing
   pdfUrl: (nodeId: string) => string | undefined; // blob/served url for previews
+  tuck: (nodeId: string) => void; // fold attached notes into the paper's edge
 };
 
 const noop = () => {};
 export const BoardActionsContext = createContext<BoardActions>({
   open: noop, chatAbout: noop, menu: noop, accept: noop, reject: noop, more: noop, readAloud: noop, editText: noop,
-  pdfUrl: () => undefined,
+  pdfUrl: () => undefined, tuck: noop,
 });
 export const useBoardActions = () => useContext(BoardActionsContext);

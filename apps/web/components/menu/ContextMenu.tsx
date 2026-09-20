@@ -7,7 +7,7 @@ export type MenuAction =
   | "broader" | "deeper" | "related" | "references" | "citedBy"
   | "supporting" | "contradicting"
   | "explain" | "summarize" | "chat"
-  | "link" | "group" | "compress" | "duplicate" | "remove";
+  | "link" | "group" | "compress" | "tuck" | "duplicate" | "remove";
 
 const EXPLORE: [MenuAction, string][] = [
   ["broader", "Broader"], ["deeper", "Deeper"], ["related", "Related papers"],
@@ -15,7 +15,7 @@ const EXPLORE: [MenuAction, string][] = [
   ["references", "References"], ["citedBy", "Cited by"],
 ];
 const AI: [MenuAction, string][] = [["explain", "Explain"], ["summarize", "Summarize"], ["chat", "Chat about this"]];
-const ORGANIZE: [MenuAction, string][] = [["link", "Link to selection"], ["group", "Group selection"], ["compress", "Compress into stack"], ["duplicate", "Duplicate"], ["remove", "Remove from canvas"]];
+const ORGANIZE: [MenuAction, string][] = [["link", "Link to selection"], ["group", "Group selection"], ["compress", "Compress into stack"], ["tuck", "Tuck notes into paper"], ["duplicate", "Duplicate"], ["remove", "Remove from canvas"]];
 
 function Section({ label, items, onPick }: { label: string; items: [MenuAction, string][]; onPick: (a: MenuAction) => void }) {
   return (
