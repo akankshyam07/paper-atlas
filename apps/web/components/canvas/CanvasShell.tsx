@@ -168,20 +168,34 @@ export function CanvasShell({ id }: { id: string }) {
       const { recommendations } = await api.recommend({ objectId: anchorId, mode, offset });
       offsets.current[key] = offset + recommendations.length;
       const fresh = recommendations.filter((r) => !isSuppressed(doc, mode, r.paper.openalexId)).slice(0, 3);
+      const ghostIds: string[] = [];
       update((d) => {
         const keep = (n: Node<NodeData>) => !(n.type === "suggestion" && n.data.suggestion?.anchorId === anchorId && n.data.suggestion.mode === mode);
         const base = d.nodes.filter(keep);
         const spots = fanOut(anchor, fresh.length, mode === "broader" ? "left" : "right", base, 190, 130);
         const ghosts = fresh.map((r, i) => toNode("suggestion", mkObject(d.id, "PAPER", r.paper.title, { index: i, openalexId: r.paper.openalexId }, spots[i].x, spots[i].y, "AI"), { suggestion: { ...r, anchorId } }));
+        ghostIds.push(...ghosts.map((g) => g.id));
         const ghostEdges = ghosts.map((g) => (mode === "broader" ? toEdge(`g-${g.id}`, g.id, anchorId, "RELATED_TO", "AI", true) : toEdge(`g-${g.id}`, anchorId, g.id, "RELATED_TO", "AI", true)));
         const dropped = new Set(d.nodes.filter((n) => !keep(n)).map((n) => n.id));
         return { ...d, nodes: [...base, ...ghosts], edges: [...d.edges.filter((e) => !dropped.has(e.source) && !dropped.has(e.target)), ...ghostEdges] };
       });
-      if (fresh.length === 0) say("No new suggestions — everything is already on the canvas or was rejected.");
+      if (fresh.length === 0) {
+        say("No new suggestions — everything is already on the canvas or was rejected.");
+      } else {
+        // Suggestions fan out beyond the current viewport, so bring the anchor
+        // and its new candidates into view — otherwise the board looks unchanged.
+        // Two frames: React Flow measures freshly added nodes on the next render,
+        // and fitView computes bounds from those measurements, so fitting any
+        // sooner uses zero-sized nodes and cuts the suggestions off.
+        requestAnimationFrame(() => requestAnimationFrame(() => flow.fitView({
+          nodes: [{ id: anchorId }, ...ghostIds.map((gid) => ({ id: gid }))],
+          padding: 0.28, duration: 400, maxZoom: 1,
+        })));
+      }
     } catch (e) {
       fail("Recommend")(e);
     }
-  }, [doc, byId, update, say, fail]);
+  }, [doc, byId, update, say, fail, flow]);
 
   const acceptSuggestion = useCallback(async (nid: string) => {
     const g = byId(nid);
