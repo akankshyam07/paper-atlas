@@ -2,7 +2,7 @@
 // GROUP-LOCKED: change only by group agreement, then everyone pulls.
 // Frontend and backend both code against these shapes.
 
-export type ObjectType = "PAPER" | "PDF" | "NOTE" | "EXCERPT" | "AI_SUMMARY" | "GROUP" | "THREAD";
+export type ObjectType = "PAPER" | "PDF" | "IMAGE" | "VIDEO" | "AUDIO" | "DOC" | "EMBED" | "NOTE" | "EXCERPT" | "AI_SUMMARY" | "GROUP" | "THREAD";
 export type EdgeType = "CITES" | "DERIVED_FROM" | "EXPLAINS" | "RELATED_TO";
 export type RecommendMode = "broader" | "deeper";
 

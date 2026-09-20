@@ -2,7 +2,7 @@
 from typing import Any, Literal, Optional
 from pydantic import BaseModel
 
-ObjectType = Literal["PAPER", "PDF", "NOTE", "EXCERPT", "AI_SUMMARY", "GROUP", "THREAD"]
+ObjectType = Literal["PAPER", "PDF", "IMAGE", "VIDEO", "AUDIO", "DOC", "EMBED", "NOTE", "EXCERPT", "AI_SUMMARY", "GROUP", "THREAD"]
 EdgeType = Literal["CITES", "DERIVED_FROM", "EXPLAINS", "RELATED_TO"]
 RecommendMode = Literal["broader", "deeper"]
 
@@ -125,3 +125,15 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     contextObjectIds: list[str]
+
+
+class EmbedRequest(BaseModel):
+    canvasId: str
+    url: str
+    title: str | None = None
+    x: float = 0.0
+    y: float = 0.0
+
+
+class EmbedResponse(BaseModel):
+    object: CanvasObject

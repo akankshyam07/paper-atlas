@@ -84,7 +84,7 @@ export const PdfNode = memo(function PdfNode({ id, data }: NodeProps<NodeData>) 
         <div className="doc-crop">
           {/* The page fragment drives the embedded viewer, so paging does not
               need the PDF to be re-fetched. */}
-          <iframe key={page} src={`${src}#page=${page}&view=FitH&toolbar=0&navpanes=0`} title={data.object.title ?? "PDF"} />
+          <iframe key={page} src={`${src}#page=${page}&view=Fit&toolbar=0&navpanes=0`} title={data.object.title ?? "PDF"} />
         </div>
       ) : (
         <div className="doc-body">{body || "Open to read"}</div>

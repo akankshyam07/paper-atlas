@@ -21,17 +21,34 @@ import { PaperNode } from "../nodes/PaperNode";
 import { SuggestionNode } from "../nodes/SuggestionNode";
 import { AiNoteNode } from "../nodes/AiNoteNode";
 import { ExcerptNode, GroupNode, NoteNode, PdfNode, ThreadNode } from "../nodes/TextNodes";
+import { AudioNode, DocNode, EmbedNode, ImageNode, VideoNode } from "../nodes/MediaNodes";
 import { ContextMenu, type MenuAction } from "../menu/ContextMenu";
 import { CommandPalette, type PaletteAction } from "../search/CommandPalette";
 import { SidePanel, type PanelTab } from "../panel/SidePanel";
 import { Viewer, type Selection, type SelectionAction } from "../panel/Viewer";
 import { ChatPanel } from "../panel/ChatPanel";
 
-const nodeTypes = { paper: PaperNode, suggestion: SuggestionNode, ai: AiNoteNode, note: NoteNode, excerpt: ExcerptNode, thread: ThreadNode, pdf: PdfNode, group: GroupNode };
+const nodeTypes = { paper: PaperNode, suggestion: SuggestionNode, ai: AiNoteNode, note: NoteNode, excerpt: ExcerptNode, thread: ThreadNode, pdf: PdfNode, group: GroupNode, image: ImageNode, video: VideoNode, audio: AudioNode, doc: DocNode, embed: EmbedNode };
 
 // ponytail: uploaded PDF bytes live in memory for the session only — there is
 // no upload endpoint yet. Cards persist; re-upload to read after a reload.
 const pdfBlobs = new Map<string, string>();
+
+// Object type -> the node component that knows how to show it.
+function kindFor(t: CanvasObject["objectType"]): NodeKind {
+  switch (t) {
+    case "EMBED": return "embed";
+    case "IMAGE": return "image";
+    case "VIDEO": return "video";
+    case "AUDIO": return "audio";
+    case "PDF": return "pdf";
+    case "PAPER": return "paper";
+    case "AI_SUMMARY": return "ai";
+    case "EXCERPT": return "excerpt";
+    case "NOTE": return "note";
+    default: return "doc";
+  }
+}
 
 function mkObject(canvasId: string, objectType: CanvasObject["objectType"], title: string | null, content: Record<string, unknown>, x: number, y: number, createdBy: "USER" | "AI" = "USER"): CanvasObject {
   return { id: uid(), canvasId, objectType, sourceEntityId: null, title, content, x, y, createdBy };
@@ -54,6 +71,7 @@ export function CanvasShell({ id }: { id: string }) {
   // two-sided. Applied to edges the user draws.
   const [connector, setConnector] = useState<"line" | "arrow" | "biarrow">("arrow");
   const boardRef = useRef<HTMLDivElement>(null);
+  const [addOpen, setAddOpen] = useState(false);
   const [lightboxId, setLightboxId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [palette, setPalette] = useState<{ open: boolean; query?: string }>({ open: false });
@@ -353,6 +371,19 @@ export function CanvasShell({ id }: { id: string }) {
     say(`Compressed ${ids.length} objects into a stack`);
   }, [doc, selected, update, say]);
 
+  const addEmbed = useCallback(async (raw?: string) => {
+    if (!doc) return;
+    const url = raw ?? window.prompt("Paste a link — YouTube, Wikipedia, an article, anything");
+    if (!url?.trim()) return;
+    const pos = centre();
+    try {
+      const { object } = await api.embed({ canvasId: doc.id, url: url.trim(), x: pos.x, y: pos.y });
+      update((d) => ({ ...d, nodes: [...d.nodes, toNode("embed", object)] }));
+    } catch (e) {
+      fail("Embed")(e);
+    }
+  }, [doc, centre, update, fail]);
+
   const removeNodes = useCallback((ids: string[]) => {
     const rm = new Set(ids);
     update((d) => ({ ...d, nodes: d.nodes.filter((n) => !rm.has(n.id) && !(n.parentNode && rm.has(n.parentNode))), edges: d.edges.filter((e) => !rm.has(e.source) && !rm.has(e.target)) }));
@@ -467,20 +498,24 @@ export function CanvasShell({ id }: { id: string }) {
   const addFiles = useCallback(async (files: FileList | File[], at?: { x: number; y: number }) => {
     if (!doc) return;
     const pos = at ?? centre();
-    const pdfs = Array.from(files).filter((f) => f.type === "application/pdf" || f.name.endsWith(".pdf"));
-    for (const [i, f] of pdfs.entries()) {
+    // PRD §7: papers, PDFs, images, video, audio and documents are all board
+    // objects. The server decides the type from the file, so nothing is filtered
+    // out here.
+    const incoming = Array.from(files);
+    for (const [i, f] of incoming.entries()) {
       const local = URL.createObjectURL(f);
       try {
         // Upload so the file survives a reload; the blob url still gives an
         // instant preview for this session.
         const { object } = await api.upload(f, doc.id, pos.x + i * 30, pos.y + i * 30);
         pdfBlobs.set(object.id, local);
-        update((d) => ({ ...d, nodes: [...d.nodes, toNode("pdf", object)] }));
+        update((d) => ({ ...d, nodes: [...d.nodes, toNode(kindFor(object.objectType), object)] }));
       } catch (e) {
         // Keep the card even if the upload fails — the user still has the file.
-        const object = mkObject(doc.id, "PDF", f.name.replace(/\.pdf$/i, ""), { filename: f.name, sizeBytes: f.size, origin: "upload" }, pos.x + i * 30, pos.y + i * 30);
+        const guessed = f.type.startsWith("image/") ? "IMAGE" : f.type.startsWith("video/") ? "VIDEO" : f.type.startsWith("audio/") ? "AUDIO" : f.name.toLowerCase().endsWith(".pdf") ? "PDF" : "DOC";
+        const object = mkObject(doc.id, guessed, f.name, { filename: f.name, sizeBytes: f.size, origin: "upload", url: local, mime: f.type }, pos.x + i * 30, pos.y + i * 30);
         pdfBlobs.set(object.id, local);
-        addLocal("pdf", object);
+        addLocal(kindFor(guessed), object);
         fail("Upload")(e);
       }
     }
@@ -526,7 +561,7 @@ export function CanvasShell({ id }: { id: string }) {
   }), [chatAbout, acceptSuggestion, rejectSuggestion, recommend, readAloud, update]);
 
   const paletteActions = useMemo<PaletteAction[]>(() => [
-    { id: "upload", label: "Upload PDF", run: () => fileInput.current?.click() },
+    { id: "upload", label: "Upload file", run: () => fileInput.current?.click() },
     { id: "note", label: "New note", run: () => addNote().catch(fail("Note")) },
     { id: "fit", label: "Fit canvas", run: () => flow.fitView({ padding: 0.2, duration: 300 }) },
   ], [addNote, fail, flow]);
@@ -595,7 +630,21 @@ export function CanvasShell({ id }: { id: string }) {
                 <button className={`tool${connector === "arrow" ? " on" : ""}`} title="Curved arrow (one-sided)" aria-pressed={connector === "arrow"} onClick={() => setConnector("arrow")}>→</button>
                 <button className={`tool${connector === "biarrow" ? " on" : ""}`} title="Curved arrow (two-sided)" aria-pressed={connector === "biarrow"} onClick={() => setConnector("biarrow")}>↔</button>
                 <button className="tool" title="New note" onClick={() => addNote().catch(fail("Note"))}>✎</button>
-                <button className="tool" title="Upload PDF" onClick={() => fileInput.current?.click()}>⇪</button>
+                <button className="tool" title="Upload file" onClick={() => fileInput.current?.click()}>⇪</button>
+                {/* Adding objects must stay reachable once the board is no
+                    longer empty — the empty state's buttons disappear. */}
+                <div className="add-wrap">
+                  <button className={`tool add${addOpen ? " on" : ""}`} title="Add to canvas"
+                    aria-expanded={addOpen} onClick={() => setAddOpen((v) => !v)}>+</button>
+                  {addOpen && (
+                    <div className="popover add-menu" onMouseLeave={() => setAddOpen(false)}>
+                      <button className="menu-item" onClick={() => { setAddOpen(false); setPalette({ open: true }); }}>Search OpenAlex</button>
+                      <button className="menu-item" onClick={() => { setAddOpen(false); fileInput.current?.click(); }}>Upload file…</button>
+                      <button className="menu-item" onClick={() => { setAddOpen(false); addEmbed(); }}>Embed link…</button>
+                      <button className="menu-item" onClick={() => { setAddOpen(false); addNote().catch(fail("Note")); }}>New note</button>
+                    </div>
+                  )}
+                </div>
                 <button className="tool accent" title="Ask AI" onClick={() => { setPanelOpen(true); setTab("Chat"); }}>✦</button>
               </div>
               {real.length === 0 && <EmptyState onSearch={() => setPalette({ open: true })} onUpload={() => fileInput.current?.click()} onDrop={addFiles} />}
@@ -633,7 +682,7 @@ export function CanvasShell({ id }: { id: string }) {
         </div>
       </div>
 
-      <input ref={fileInput} type="file" accept="application/pdf" multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }} />
+      <input ref={fileInput} type="file" accept="image/*,video/*,audio/*,.pdf,.txt,.md,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.epub"  multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }} />
       {menu && <ContextMenu x={menu.x} y={menu.y} kind={(byId(menu.id)?.type ?? "note") as NodeKind} onAction={(a) => onMenuAction(menu.id, a)} onClose={() => setMenu(null)} />}
       {palette.open && (
         <CommandPalette

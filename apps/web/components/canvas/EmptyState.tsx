@@ -12,7 +12,7 @@ export function EmptyState({ onSearch, onUpload, onDrop }: { onSearch: () => voi
         <p>Drop a paper, a PDF, or a question. Everything you derive stays on the board, linked to where it came from.</p>
         <div className="actions">
           <button className="btn lg primary" onClick={onSearch}>Search OpenAlex</button>
-          <button className="btn lg" onClick={onUpload}>Upload PDF</button>
+          <button className="btn lg" onClick={onUpload}>Upload file</button>
         </div>
         <div
           className={`drop${over ? " over" : ""}`}

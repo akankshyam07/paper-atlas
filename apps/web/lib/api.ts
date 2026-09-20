@@ -1,6 +1,7 @@
 // Typed fetch client. All backend calls go through here.
 // Imports the shared contract so FE and BE cannot drift apart.
 import type {
+  CanvasObject,
   SearchResponse,
   AddObjectRequest, AddObjectResponse,
   AddEdgeRequest, AddEdgeResponse,
@@ -36,6 +37,7 @@ export const api = {
     post("/explain", req),
   citations: (objectId: string, direction: CitationDirection, limit = 25): Promise<SearchResponse> =>
     fetch(`${BASE}/citations?objectId=${encodeURIComponent(objectId)}&direction=${direction}&limit=${limit}`).then((r) => r.json()),
+  embed: (req: { canvasId: string; url: string; title?: string; x?: number; y?: number }): Promise<{ object: CanvasObject }> => post("/embed", req),
   chat: (req: ChatRequest): Promise<ChatResponse> => post("/chat", req),
   stance: (req: StanceRequest): Promise<RecResponse> => post("/stance", req),
   suppress: (req: SuppressRequest): Promise<unknown> => post("/suppressions", req),

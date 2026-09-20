@@ -71,7 +71,7 @@ export const PaperNode = memo(function PaperNode({ id, data }: NodeProps<NodeDat
               <div className="leaf right"><iframe key={`r${page}`} src={`${src}#page=${page + 1}&view=Fit&toolbar=0&navpanes=0&scrollbar=0`} title={`${data.object.title} page ${page + 1}`} /></div>
             </>
           ) : (
-            <div className="leaf"><iframe key={page} src={`${src}#page=${page}&view=FitH&toolbar=0&navpanes=0&scrollbar=0`} title={data.object.title ?? "Paper"} /></div>
+            <div className="leaf"><iframe key={page} src={`${src}#page=${page}&view=Fit&toolbar=0&navpanes=0&scrollbar=0`} title={data.object.title ?? "Paper"} /></div>
           )
         ) : (
           // No open-access PDF: typeset the abstract so the node still reads as

@@ -327,7 +327,7 @@ a:hover { color: var(--accent-hover); }
 .node.sheet { width: 420px; padding: 0; background: transparent; border: 0; box-shadow: none; }
 .node.sheet.book { width: 620px; }
 
-.sheet-stage { position: relative; display: block; height: 545px; perspective: 1600px; }
+.sheet-stage { position: relative; display: block; height: 544px; perspective: 1600px; }
 .sheet-stage.spread { display: grid; grid-template-columns: 1fr 1fr; gap: 0; height: 430px; }
 
 .sheet-stage .leaf { position: relative; height: 100%; background: #fff; overflow: hidden;
@@ -373,3 +373,33 @@ a:hover { color: var(--accent-hover); }
 
 .node.sheet .node-actions { top: 8px; right: 8px; }
 .react-flow__node.selected .node.sheet .leaf { border-color: var(--accent); box-shadow: var(--ring); }
+
+/* ---- Media objects (PRD §7) -------------------------------------------- */
+/* Images and video sit large enough to read/watch on the board. */
+.node.media { width: 420px; padding: 0; background: transparent; border: 0; box-shadow: none; }
+.node.media .media-frame { display: block; width: 100%; max-height: 420px; object-fit: contain;
+  background: #0d0d0f; border: 1px solid var(--line); border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.07), 0 10px 26px rgba(0,0,0,0.10); }
+.node.media .media-frame.empty { display: grid; place-items: center; height: 200px;
+  background: var(--surface-2); color: var(--ink-5); font-size: 12px; }
+.node.media .sheet-foot { padding: 9px 2px 0; }
+
+/* One common card for everything else: slides, spreadsheets, audio, books. */
+.node.doc-card { width: 260px; }
+.doc-icon { width: 46px; height: 56px; border-radius: 5px; background: var(--surface-2);
+  border: 1px solid var(--line); display: grid; place-items: center;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.03em; color: var(--ink-4); margin-bottom: 10px; }
+.node.doc-card a.chip { display: inline-block; margin-top: 10px; text-decoration: none; }
+
+/* Persistent add control — the empty state's buttons vanish once the board has
+   objects, so adding has to live in the toolbar too. */
+.add-wrap { position: relative; }
+.tool.add { font-size: 17px; line-height: 1; color: var(--accent); font-weight: 500; }
+.add-menu { position: absolute; left: calc(100% + 8px); top: 0; width: 170px; padding: 4px; z-index: 30; }
+
+/* Embeds: video providers get a 16:9 player, pages get a taller reading frame. */
+.node.media.embed .media-frame { height: 320px; background: #000; }
+.node.media.embed.video { width: 480px; }
+.node.media.embed.video .media-frame { height: 270px; }
+.node.media.embed .sheet-sub a { color: var(--ink-4); text-decoration: none; }
+.node.media.embed .sheet-sub a:hover { color: var(--accent); }

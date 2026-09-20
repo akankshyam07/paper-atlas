@@ -12,7 +12,38 @@ import pathlib
 BUCKET = os.getenv("SUPABASE_BUCKET", "uploads")
 LOCAL_DIR = pathlib.Path(os.getenv("LOCAL_STORAGE_DIR", ".storage"))
 MAX_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
-ALLOWED = {"application/pdf", "text/plain", "text/markdown", "application/octet-stream"}
+# PRD §7: papers and PDFs are first class; images get view + zoom; video,
+# audio, slides, spreadsheets and documents are carried as a common card with
+# partial viewing. Executables and archives stay out — nothing we can display.
+ALLOWED_PREFIXES = ("image/", "video/", "audio/", "text/")
+ALLOWED = {
+    "application/pdf",
+    "application/octet-stream",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/epub+zip",
+    "application/rtf",
+    "application/json",
+}
+
+
+def object_type_for(mime: str, filename: str = "") -> str:
+    """Map a file to the canvas object type that knows how to show it."""
+    mime = (mime or "").lower()
+    name = filename.lower()
+    if mime.startswith("image/") or name.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".heic")):
+        return "IMAGE"
+    if mime.startswith("video/") or name.endswith((".mp4", ".mov", ".webm", ".m4v")):
+        return "VIDEO"
+    if mime.startswith("audio/") or name.endswith((".mp3", ".wav", ".m4a", ".aac", ".ogg")):
+        return "AUDIO"
+    if mime == "application/pdf" or name.endswith(".pdf"):
+        return "PDF"
+    return "DOC"
 
 
 class UploadTooLarge(Exception):
@@ -27,7 +58,7 @@ def _validate(data: bytes, mime: str) -> None:
     # Trust boundary: never store what we have not size- and type-checked.
     if len(data) > MAX_BYTES:
         raise UploadTooLarge(f"file is {len(data)} bytes, limit is {MAX_BYTES}")
-    if mime not in ALLOWED:
+    if mime not in ALLOWED and not mime.startswith(ALLOWED_PREFIXES):
         raise UploadTypeNotAllowed(mime)
 
 

@@ -37,7 +37,7 @@ async def upload(
     obj = service.ingest_file(
         db, canvas_id=uuid.UUID(canvasId), data=data,
         filename=file.filename or "upload", origin="upload", x=x, y=y,
-        storage_key=key,
+        storage_key=key, mime=file.content_type or "application/octet-stream",
     )
     return {
         "object": CanvasObject(
@@ -49,12 +49,27 @@ async def upload(
     }
 
 
+# Extension -> media type, so a stored file is served as what it actually is
+# and the browser can render images and stream video.
+_MEDIA = {
+    ".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp",
+    ".svg": "image/svg+xml", ".mp4": "video/mp4", ".mov": "video/quicktime",
+    ".webm": "video/webm", ".mp3": "audio/mpeg", ".wav": "audio/wav",
+    ".m4a": "audio/mp4", ".txt": "text/plain", ".md": "text/markdown",
+}
+
+
 @router.get("/files/{key}")
 def serve(key: str) -> Response:
+    import pathlib as _p
+
     data = storage.load(key)
     if data is None:
         raise HTTPException(status_code=404, detail="file not found")
-    return Response(content=data, media_type="application/pdf")
+    media = _MEDIA.get(_p.Path(key).suffix.lower(), "application/octet-stream")
+    return Response(content=data, media_type=media,
+                    headers={"Accept-Ranges": "bytes", "Cache-Control": "public, max-age=3600"})
 
 
 @router.get("/proxy/pdf")

@@ -151,6 +151,7 @@ def ingest_file(
     x: float = 0.0,
     y: float = 0.0,
     storage_key: str | None = None,
+    mime: str = "application/pdf",
 ) -> CanvasObject:
     """The one ingestion path for uploaded files.
 
@@ -165,11 +166,14 @@ def ingest_file(
         metadata={"filename": filename, "size_bytes": len(data), "origin": origin,
                   "storage_key": storage_key},
     )
+    from db.storage import object_type_for
+
     return create_object(
-        db, canvas_id=canvas_id, object_type="PDF", title=filename,
+        db, canvas_id=canvas_id, object_type=object_type_for(mime, filename), title=filename,
         content={"filename": filename, "origin": origin, "sizeBytes": len(data),
-                 "storageKey": storage_key,
-                 "pdfUrl": f"/api/files/{storage_key}" if storage_key else None},
+                 "storageKey": storage_key, "mime": mime,
+                 "url": f"/api/files/{storage_key}" if storage_key else None,
+                 "pdfUrl": f"/api/files/{storage_key}" if storage_key and mime == "application/pdf" else None},
         source_entity_id=entity.id, x=x, y=y,
     )
 

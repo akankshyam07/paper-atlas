@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Edge, Node, Viewport } from "reactflow";
 import type { CanvasObject, EdgeType, PaperPreview, Recommendation } from "@atlas/types";
 
-export type NodeKind = "paper" | "pdf" | "note" | "excerpt" | "ai" | "thread" | "suggestion" | "group";
+export type NodeKind = "paper" | "pdf" | "image" | "video" | "audio" | "doc" | "embed" | "note" | "excerpt" | "ai" | "thread" | "suggestion" | "group";
 
 export type NodeData = {
   object: CanvasObject;
