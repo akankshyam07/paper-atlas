@@ -3,18 +3,19 @@ routes/components (context.md: don't bury OpenAlex assumptions in callers).
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 # Fields we ask OpenAlex for. `select=` keeps payloads small (PRD §12).
 WORK_FIELDS = (
     "id,doi,title,display_name,publication_year,type,cited_by_count,fwci,"
     "authorships,primary_location,best_oa_location,open_access,topics,keywords,"
-    "referenced_works,related_works,abstract_inverted_index,counts_by_year"
+    "referenced_works,related_works,abstract_inverted_index,counts_by_year,locations"
 )
 # Lighter projection for search results / candidate pools.
 LIST_FIELDS = (
     "id,doi,title,display_name,publication_year,type,cited_by_count,fwci,"
-    "authorships,primary_location,best_oa_location,open_access,topics,keywords"
+    "authorships,primary_location,best_oa_location,open_access,topics,keywords,locations"
 )
 
 
@@ -54,13 +55,31 @@ def venue(work: dict[str, Any]) -> str | None:
     return src.get("display_name") or loc.get("raw_source_name")
 
 
+_ARXIV = re.compile(r"arxiv\.org/(?:abs|pdf)/(.+?)(?:v\d+)?(?:\.pdf)?/?$", re.I)
+
+
+def _arxiv_pdf(url: str | None) -> str | None:
+    m = _ARXIV.search(url or "")
+    return f"https://arxiv.org/pdf/{m.group(1)}" if m else None
+
+
 def pdf_url(work: dict[str, Any]) -> str | None:
-    """Priority per PRD §12: content pdf -> best_oa_location -> none."""
-    for loc in (work.get("best_oa_location"), work.get("primary_location")):
+    """Priority per PRD §12: any OA location's pdf -> arXiv landing page -> an
+    oa_url that is itself a PDF.
+
+    A landing page is deliberately NOT returned: the viewer cannot render HTML,
+    so the node would show a broken preview where the abstract belongs.
+    """
+    locs = [work.get("best_oa_location"), work.get("primary_location"), *(work.get("locations") or [])]
+    for loc in locs:
         if loc and loc.get("pdf_url"):
             return loc["pdf_url"]
-    oa = work.get("open_access") or {}
-    return oa.get("oa_url")
+    for loc in locs:
+        arx = _arxiv_pdf((loc or {}).get("landing_page_url"))
+        if arx:
+            return arx
+    oa = (work.get("open_access") or {}).get("oa_url")
+    return _arxiv_pdf(oa) or (oa if (oa or "").lower().endswith(".pdf") else None)
 
 
 def has_pdf(work: dict[str, Any]) -> bool:

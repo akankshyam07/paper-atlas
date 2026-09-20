@@ -109,3 +109,23 @@ def test_recommendation_carries_label_and_reason():
     assert r["relationshipLabel"]
     assert r["reason"]
     assert isinstance(r["score"], float)
+
+
+def test_pdf_url_prefers_any_oa_pdf_then_arxiv_and_never_a_landing_page():
+    from openalex import mapping
+
+    # A pdf on a non-primary location still counts.
+    assert mapping.pdf_url({
+        "best_oa_location": {"landing_page_url": "https://example.com/abs/1"},
+        "locations": [{"pdf_url": "https://example.com/paper.pdf"}],
+    }) == "https://example.com/paper.pdf"
+
+    # arXiv landing pages are mechanically turned into the pdf.
+    assert mapping.pdf_url({
+        "best_oa_location": {"landing_page_url": "https://arxiv.org/abs/1706.03762v5"},
+    }) == "https://arxiv.org/pdf/1706.03762"
+
+    # An HTML landing page is worse than nothing: the node shows the abstract.
+    assert mapping.pdf_url({
+        "open_access": {"oa_url": "https://journal.example.org/article/view/42"},
+    }) is None

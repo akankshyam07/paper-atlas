@@ -1,10 +1,11 @@
 "use client";
 // A paper on the board IS the document: the rendered page, readable at 100%
 // zoom, not a metadata card. Books open as a two-page spread that flips.
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 import type { NodeData } from "../../lib/store";
 import { useBoardActions } from "../canvas/actions";
+import { PdfPage } from "./PdfPage";
 
 export function QuickActions({ id }: { id: string }) {
   const a = useBoardActions();
@@ -35,13 +36,20 @@ export const PaperNode = memo(function PaperNode({ id, data }: NodeProps<NodeDat
     authors?: string[]; type?: string; pageCount?: number;
     tucked?: { id: string; x: number; y: number }[];
   };
-  const src = viaProxy(c.pdfUrl);
+  // Most OpenAlex records have no usable OA pdf, and some "pdf" links are dead
+  // or serve HTML. The abstract is a better node than a broken preview, so a
+  // failed load drops the whole document UI rather than showing an error box.
+  const [broken, setBroken] = useState(false);
+  const onFail = useCallback(() => setBroken(true), []);
+  const src = broken ? undefined : viaProxy(c.pdfUrl);
   const isBook = (c.type ?? "").includes("book");
   const [page, setPage] = useState(1);
   const [flip, setFlip] = useState<"none" | "fwd" | "back">("none");
   // Reading mode hands the document its own scrolling and text selection. Off
   // by default so the node still drags and right-clicks like a card.
   const [reading, setReading] = useState(false);
+  // Page count comes from the document itself; OpenAlex does not report it.
+  const [pages, setPages] = useState<number | undefined>(c.pageCount);
   const step = isBook ? 2 : 1;
 
   // Mount the viewer only while the node is actually on screen. A board of
@@ -99,18 +107,17 @@ export const PaperNode = memo(function PaperNode({ id, data }: NodeProps<NodeDat
         {src && onScreen ? (
           isBook ? (
             <>
-              <div className="leaf left"><iframe key={`l${page}`} src={pageSrc(src, page, "Fit")} title={`${data.object.title} page ${page}`} /></div>
-              <div className="leaf right"><iframe key={`r${page}`} src={pageSrc(src, page + 1, "Fit")} title={`${data.object.title} page ${page + 1}`} /></div>
+              <div className="leaf left"><PdfPage url={src} page={page} onPages={setPages} onFail={onFail} /></div>
+              <div className="leaf right"><PdfPage url={src} page={page + 1} /></div>
             </>
           ) : (
             <div className="leaf">
-              {/* In reading mode the whole document loads so it scrolls; the
-                  card view pins a single fitted page. */}
-              <iframe
-                key={reading ? "read" : `page-${page}`}
-                src={reading ? `${src}#toolbar=0&navpanes=0` : pageSrc(src, page, "Fit")}
-                title={data.object.title ?? "Paper"}
-              />
+              {/* Reading mode hands the whole document to the browser's viewer
+                  so it scrolls; the card shows one rendered page, which is the
+                  only way paging is reliable. */}
+              {reading
+                ? <iframe key="read" src={`${src}#toolbar=0&navpanes=0`} title={data.object.title ?? "Paper"} />
+                : <PdfPage url={src} page={page} onPages={setPages} onFail={onFail} />}
             </div>
           )
         ) : (
@@ -133,9 +140,9 @@ export const PaperNode = memo(function PaperNode({ id, data }: NodeProps<NodeDat
             <>
               <button onClick={() => turn(-1)} disabled={page <= 1} aria-label="Previous page">‹</button>
               <span className="pager-count">
-                {isBook ? `${page}–${page + 1}` : page}{c.pageCount ? ` / ${c.pageCount}` : ""}
+                {isBook ? `${page}–${page + 1}` : page}{pages ? ` / ${pages}` : ""}
               </span>
-              <button onClick={() => turn(1)} disabled={!!c.pageCount && page >= c.pageCount} aria-label="Next page">›</button>
+              <button onClick={() => turn(1)} disabled={!!pages && page + (isBook ? 1 : 0) >= pages} aria-label="Next page">›</button>
             </>
           )}
           {!isBook && (
