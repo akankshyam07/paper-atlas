@@ -2,7 +2,7 @@
 // GROUP-LOCKED: change only by group agreement, then everyone pulls.
 // Frontend and backend both code against these shapes.
 
-export type ObjectType = "PAPER" | "NOTE" | "EXCERPT" | "AI_SUMMARY";
+export type ObjectType = "PAPER" | "PDF" | "NOTE" | "EXCERPT" | "AI_SUMMARY" | "GROUP" | "THREAD";
 export type EdgeType = "CITES" | "DERIVED_FROM" | "EXPLAINS" | "RELATED_TO";
 export type RecommendMode = "broader" | "deeper";
 
@@ -136,3 +136,9 @@ export interface SynthesizeRequest {
   text: string;
 }
 // returns audio bytes (audio/mpeg); no JSON body
+
+// GET /citations?objectId=&direction=out|in|related  -> owner: backend-ai
+// out = works this paper cites (references); in = works citing it; related =
+// OpenAlex related_works. Returns previews; adding to the canvas stays explicit.
+export type CitationDirection = "out" | "in" | "related";
+// response shape is SearchResponse

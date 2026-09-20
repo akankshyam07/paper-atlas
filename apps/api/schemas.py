@@ -2,7 +2,7 @@
 from typing import Any, Literal, Optional
 from pydantic import BaseModel
 
-ObjectType = Literal["PAPER", "NOTE", "EXCERPT", "AI_SUMMARY"]
+ObjectType = Literal["PAPER", "PDF", "NOTE", "EXCERPT", "AI_SUMMARY", "GROUP", "THREAD"]
 EdgeType = Literal["CITES", "DERIVED_FROM", "EXPLAINS", "RELATED_TO"]
 RecommendMode = Literal["broader", "deeper"]
 

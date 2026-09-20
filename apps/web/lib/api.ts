@@ -6,6 +6,7 @@ import type {
   AddEdgeRequest, AddEdgeResponse,
   RecommendRequest, RecommendResponse,
   ExplainRequest, ExplainResponse,
+  CitationDirection,
   DropboxListResponse, DropboxImportRequest, DropboxImportResponse,
   TranscribeResponse,
 } from "../../../packages/types/api";
@@ -33,6 +34,8 @@ export const api = {
     post("/recommend", req),
   explain: (req: ExplainRequest): Promise<ExplainResponse> =>
     post("/explain", req),
+  citations: (objectId: string, direction: CitationDirection, limit = 25): Promise<SearchResponse> =>
+    fetch(`${BASE}/citations?objectId=${encodeURIComponent(objectId)}&direction=${direction}&limit=${limit}`).then((r) => r.json()),
   dropboxList: (path = ""): Promise<DropboxListResponse> =>
     fetch(`${BASE}/integrations/dropbox/files?path=${encodeURIComponent(path)}`).then((r) => r.json()),
   dropboxImport: (req: DropboxImportRequest): Promise<DropboxImportResponse> =>

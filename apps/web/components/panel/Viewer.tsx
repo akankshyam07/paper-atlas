@@ -4,6 +4,8 @@
 // Capture / AI / Research actions; the selection's source object + offsets
 // travel with the action so excerpts keep provenance.
 import { useCallback, useEffect, useState } from "react";
+import { api } from "../../lib/api";
+import type { PaperPreview } from "@atlas/types";
 import type { Node } from "reactflow";
 import type { NodeData } from "../../lib/store";
 
@@ -20,10 +22,24 @@ export function Viewer({ node, edges, pdfUrl, onSelectionAction, onAction }: {
   onAction: (a: "broader" | "deeper" | "explain" | "chat") => void;
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Abstract");
+  const [cites, setCites] = useState<{ loading: boolean; items: PaperPreview[] }>({ loading: false, items: [] });
   const [menu, setMenu] = useState<{ x: number; y: number; sel: Selection } | null>(null);
   const o = node.data.object;
   const p = node.data.paper;
   const body = String(o.content.abstract ?? o.content.text ?? "");
+
+  // References and Cited by come from OpenAlex on demand — only when the tab is
+  // opened, so switching objects costs nothing (PRD §12: fetch what is touched).
+  useEffect(() => {
+    const dir = tab === "References" ? "out" : tab === "Cited by" ? "in" : null;
+    if (!dir || !p) { setCites({ loading: false, items: [] }); return; }
+    let cancelled = false;
+    setCites({ loading: true, items: [] });
+    api.citations(o.id, dir, 25)
+      .then((r) => { if (!cancelled) setCites({ loading: false, items: r.results }); })
+      .catch(() => { if (!cancelled) setCites({ loading: false, items: [] }); });
+    return () => { cancelled = true; };
+  }, [tab, o.id, p]);
 
   const onMouseUp = useCallback(() => {
     const s = window.getSelection();
@@ -69,8 +85,30 @@ export function Viewer({ node, edges, pdfUrl, onSelectionAction, onAction }: {
           pdfUrl ? <iframe className="reader-frame" src={pdfUrl} title={o.title ?? "PDF"} /> : (
             <div className="reader-placeholder">This PDF’s bytes aren’t stored yet.<br />Re-upload it to read in this session.</div>
           )
-        ) : tab !== "Abstract" && p ? (
-          <div className="empty">{tab} aren’t exposed by the API yet.</div>
+        ) : tab === "Topics" && p ? (
+          <div className="node-chips" style={{ padding: "12px 14px" }}>
+            {[...(o.content.topics as string[] ?? []), ...(o.content.keywords as string[] ?? [])].length === 0
+              ? <div className="empty">No topics on this work.</div>
+              : [...new Set([...(o.content.topics as string[] ?? []), ...(o.content.keywords as string[] ?? [])])]
+                  .map((t) => <span key={t} className="chip">{t}</span>)}
+          </div>
+        ) : (tab === "References" || tab === "Cited by") && p ? (
+          cites.loading ? <div className="empty">Loading {tab.toLowerCase()}…</div>
+            : cites.items.length === 0 ? <div className="empty">OpenAlex lists no {tab.toLowerCase()} for this work.</div>
+            : (
+              <ul className="citelist">
+                {cites.items.map((c) => (
+                  <li key={c.openalexId}>
+                    <div className="citetitle">{c.title}</div>
+                    <div className="citemeta">
+                      {c.authors.slice(0, 3).join(", ")}
+                      {c.year ? ` · ${c.year}` : ""}
+                      {` · ${c.citedByCount.toLocaleString()} citations`}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )
         ) : body ? (
           <div className="viewer-body">{body.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}</div>
         ) : (

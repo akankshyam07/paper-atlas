@@ -38,18 +38,17 @@ All fixed. CI is green.
 
 4. **Add `OPENAI_API_KEY`** to `apps/api/.env`. Everything is wired; without it
    explanations return stub text. ($50 sponsor credits available.)
-5. **Papers carry no abstract.** `POST /objects` stores only `{openalexId}`, so
-   the Viewer's Abstract tab is empty and there is nothing to select text from —
-   which blocks excerpts, highlight, and explain-selection. Fetch the work on add
-   and persist title/abstract/authors/topics into `canvas_objects.content` (and
-   `openalex_works_cache`).
-6. **References / Cited by / Related papers are not implemented.** The context
-   menu falls back to opening the command palette with the title as a query. The
-   OpenAlex client already has `get_citations(direction=in|out)` — add
-   `GET /citations` and wire the three menu actions to real candidate nodes.
-7. **Dropbox import returns a stub object.** `integrations/routes.py` calls
-   `download()` then discards the bytes. Wire it to `service.ingest_file()` so an
-   imported PDF becomes a real object and dedupes against OpenAlex.
+5. ~~Papers carry no abstract.~~ `POST /objects` now fetches the work on add and
+   stores abstract, authors, venue, topics, keywords and PDF url on the object,
+   and writes `openalex_works_cache`. The Viewer renders the real abstract, which
+   is also the text the user selects to make excerpts.
+6. ~~References / Cited by / Related not implemented.~~ Added `GET /citations`
+   (out / in / related). The Viewer tabs load them on demand, and the three menu
+   actions now produce the same translucent preview nodes as Broader/Deeper —
+   references upstream, citing and related work downstream.
+7. ~~Dropbox import returns a stub.~~ Now routes through `service.ingest_file()`,
+   so an imported file is a persisted PDF object deduped to a canonical source
+   entity — the same path a manual upload takes.
 8. **No upload endpoint.** Uploaded PDF bytes live in a browser `Map` for the
    session only (`CanvasShell.tsx:32`), so PDFs vanish on reload. Needs
    `POST /files` + Supabase Storage (`db/storage.py` is still a stub).

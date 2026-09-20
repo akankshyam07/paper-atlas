@@ -9,7 +9,7 @@ import ReactFlow, {
   type Connection, type Edge, type EdgeChange, type Node, type NodeChange, type Viewport,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import type { CanvasObject, PaperPreview, RecommendMode } from "@atlas/types";
+import type { CanvasObject, CitationDirection, PaperPreview, Recommendation, RecommendMode } from "@atlas/types";
 import { api } from "../../lib/api";
 import { bbox, fanOut, NODE_H, NODE_W } from "../../lib/layout";
 import { isSuppressed, uid, useCanvasDoc, type ChatMessage, type EdgeData, type NodeData, type NodeKind } from "../../lib/store";
@@ -157,7 +157,35 @@ export function CanvasShell({ id }: { id: string }) {
     return placed;
   }, [doc, byId, nodes, centre, update]);
 
-  // ---- recommendations (PRD §13/§25) ----
+  // ---- recommendations & citations (PRD §13/§25) ----
+  // One placement path for every kind of candidate: Broader/Deeper, references,
+  // cited-by and related all appear as the same translucent preview nodes with
+  // accept/reject, so accepting works identically whatever produced them.
+  const placeGhosts = useCallback((anchorId: string, anchor: Node<NodeData>, mode: RecommendMode, fresh: Recommendation[]) => {
+    const ghostIds: string[] = [];
+    update((d) => {
+      const keep = (n: Node<NodeData>) => !(n.type === "suggestion" && n.data.suggestion?.anchorId === anchorId && n.data.suggestion.mode === mode);
+      const base = d.nodes.filter(keep);
+      const spots = fanOut(anchor, fresh.length, mode === "broader" ? "left" : "right", base, 190, 130);
+      const ghosts = fresh.map((r, i) => toNode("suggestion", mkObject(d.id, "PAPER", r.paper.title, { index: i, openalexId: r.paper.openalexId }, spots[i].x, spots[i].y, "AI"), { suggestion: { ...r, anchorId } }));
+      ghostIds.push(...ghosts.map((g) => g.id));
+      const ghostEdges = ghosts.map((g) => (mode === "broader" ? toEdge(`g-${g.id}`, g.id, anchorId, "RELATED_TO", "AI", true) : toEdge(`g-${g.id}`, anchorId, g.id, "RELATED_TO", "AI", true)));
+      const dropped = new Set(d.nodes.filter((n) => !keep(n)).map((n) => n.id));
+      return { ...d, nodes: [...base, ...ghosts], edges: [...d.edges.filter((e) => !dropped.has(e.source) && !dropped.has(e.target)), ...ghostEdges] };
+    });
+    if (!ghostIds.length) return false;
+    // Candidates fan out beyond the current viewport, so bring the anchor and
+    // its new candidates into view — otherwise the board looks unchanged.
+    // Two frames: React Flow measures freshly added nodes on the next render,
+    // and fitView computes bounds from those measurements, so fitting any
+    // sooner uses zero-sized nodes and cuts the candidates off.
+    requestAnimationFrame(() => requestAnimationFrame(() => flow.fitView({
+      nodes: [{ id: anchorId }, ...ghostIds.map((gid) => ({ id: gid }))],
+      padding: 0.28, duration: 400, maxZoom: 1,
+    })));
+    return true;
+  }, [update, flow]);
+
   const recommend = useCallback(async (anchorId: string, mode: RecommendMode, more = false) => {
     if (!doc) return;
     const anchor = byId(anchorId);
@@ -168,34 +196,43 @@ export function CanvasShell({ id }: { id: string }) {
       const { recommendations } = await api.recommend({ objectId: anchorId, mode, offset });
       offsets.current[key] = offset + recommendations.length;
       const fresh = recommendations.filter((r) => !isSuppressed(doc, mode, r.paper.openalexId)).slice(0, 3);
-      const ghostIds: string[] = [];
-      update((d) => {
-        const keep = (n: Node<NodeData>) => !(n.type === "suggestion" && n.data.suggestion?.anchorId === anchorId && n.data.suggestion.mode === mode);
-        const base = d.nodes.filter(keep);
-        const spots = fanOut(anchor, fresh.length, mode === "broader" ? "left" : "right", base, 190, 130);
-        const ghosts = fresh.map((r, i) => toNode("suggestion", mkObject(d.id, "PAPER", r.paper.title, { index: i, openalexId: r.paper.openalexId }, spots[i].x, spots[i].y, "AI"), { suggestion: { ...r, anchorId } }));
-        ghostIds.push(...ghosts.map((g) => g.id));
-        const ghostEdges = ghosts.map((g) => (mode === "broader" ? toEdge(`g-${g.id}`, g.id, anchorId, "RELATED_TO", "AI", true) : toEdge(`g-${g.id}`, anchorId, g.id, "RELATED_TO", "AI", true)));
-        const dropped = new Set(d.nodes.filter((n) => !keep(n)).map((n) => n.id));
-        return { ...d, nodes: [...base, ...ghosts], edges: [...d.edges.filter((e) => !dropped.has(e.source) && !dropped.has(e.target)), ...ghostEdges] };
-      });
-      if (fresh.length === 0) {
+      if (!placeGhosts(anchorId, anchor, mode, fresh)) {
         say("No new suggestions — everything is already on the canvas or was rejected.");
-      } else {
-        // Suggestions fan out beyond the current viewport, so bring the anchor
-        // and its new candidates into view — otherwise the board looks unchanged.
-        // Two frames: React Flow measures freshly added nodes on the next render,
-        // and fitView computes bounds from those measurements, so fitting any
-        // sooner uses zero-sized nodes and cuts the suggestions off.
-        requestAnimationFrame(() => requestAnimationFrame(() => flow.fitView({
-          nodes: [{ id: anchorId }, ...ghostIds.map((gid) => ({ id: gid }))],
-          padding: 0.28, duration: 400, maxZoom: 1,
-        })));
       }
     } catch (e) {
       fail("Recommend")(e);
     }
-  }, [doc, byId, update, say, fail, flow]);
+  }, [doc, byId, say, fail, placeGhosts]);
+
+  const showCitations = useCallback(async (anchorId: string, direction: CitationDirection) => {
+    if (!doc) return;
+    const anchor = byId(anchorId);
+    if (!anchor) return;
+    // References sit upstream (what this builds on); citing and related work
+    // sits downstream — same spatial grammar as Broader/Deeper.
+    const mode: RecommendMode = direction === "out" ? "broader" : "deeper";
+    const label = direction === "out" ? "reference" : direction === "in" ? "cited by" : "related work";
+    try {
+      const { results } = await api.citations(anchorId, direction);
+      const fresh: Recommendation[] = results
+        .filter((paper) => !isSuppressed(doc, mode, paper.openalexId))
+        .slice(0, 3)
+        .map((paper) => ({
+          paper, mode, relationshipLabel: label,
+          reason: direction === "out"
+            ? `cited by this paper${paper.year ? ` · ${paper.year}` : ""}`
+            : direction === "in"
+              ? `cites this paper · ${paper.citedByCount.toLocaleString()} citations`
+              : "OpenAlex related work",
+          score: 0,
+        }));
+      if (!placeGhosts(anchorId, anchor, mode, fresh)) {
+        say(`No ${label} results — OpenAlex has none, or they are already on the canvas.`);
+      }
+    } catch (e) {
+      fail("Citations")(e);
+    }
+  }, [doc, byId, say, fail, placeGhosts]);
 
   const acceptSuggestion = useCallback(async (nid: string) => {
     const g = byId(nid);
@@ -251,7 +288,9 @@ export function CanvasShell({ id }: { id: string }) {
     if (!n || !doc) return;
     switch (a) {
       case "broader": case "deeper": return recommend(nid, a);
-      case "related": case "references": case "citedBy": return setPalette({ open: true, query: n.data.object.title ?? "" });
+      case "references": return showCitations(nid, "out");
+      case "citedBy": return showCitations(nid, "in");
+      case "related": return showCitations(nid, "related");
       case "explain": return explain(nid, undefined, "Explanation").catch(fail("Explain"));
       case "summarize": return explain(nid, undefined, "Summary").catch(fail("Summarize"));
       case "chat": return chatAbout(nid);
@@ -268,7 +307,7 @@ export function CanvasShell({ id }: { id: string }) {
       }
       case "remove": return removeNodes([nid]);
     }
-  }, [byId, doc, recommend, explain, chatAbout, selected, groupSelection, addLocal, removeNodes, update, say, fail]);
+  }, [byId, doc, recommend, showCitations, explain, chatAbout, selected, groupSelection, addLocal, removeNodes, update, say, fail]);
 
   // ---- chat ----
   const send = useCallback(async () => {

@@ -13,6 +13,8 @@ from db.session import get_db
 from canvas import service
 from canvas.dedup import resolve_or_create_source_entity
 from models.entities import CanvasObject as CanvasObjectModel
+from openalex import mapping
+from providers.registry import get_research_data
 from schemas import (
     AddObjectRequest, AddObjectResponse,
     AddEdgeRequest, AddEdgeResponse,
@@ -56,17 +58,32 @@ def create_canvas(req: CreateCanvasRequest, db: Session = Depends(get_db)) -> Cr
 @router.post("/objects", response_model=AddObjectResponse)
 def add_object(req: AddObjectRequest, db: Session = Depends(get_db)) -> AddObjectResponse:
     source_entity_id = None
+    content = dict(req.content or {})
+    title = req.title
+
     if req.openalexId:
         entity = resolve_or_create_source_entity(
             db, source_type="OPENALEX_WORK", external_id=req.openalexId, title=req.title,
         )
         source_entity_id = entity.id
+
+        # Fetch the work once, on add, so the object carries its abstract and
+        # metadata. The abstract is what the viewer renders, and therefore what
+        # the user can select to create excerpts, notes and explanations.
+        work = get_research_data().get_work(req.openalexId)
+        if work:
+            content = {**mapping.to_object_content(work), **content}
+            title = title or work.get("title") or work.get("display_name")
+            if not entity.title:
+                entity.title = title
+            service.cache_openalex_work(db, source_entity_id=entity.id, work=work)
+
     obj = service.create_object(
         db,
         canvas_id=uuid.UUID(req.canvasId),
         object_type=req.objectType,
-        title=req.title,
-        content=req.content,
+        title=title,
+        content=content,
         source_entity_id=source_entity_id,
         x=req.x,
         y=req.y,

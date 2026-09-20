@@ -120,20 +120,32 @@ def get_neighbors(db: Session, object_id: uuid.UUID, depth: int = 1) -> list[Can
     return db.execute(select(CanvasObject).where(CanvasObject.id.in_(seen))).scalars().all()
 
 
-def ingest_file(db: Session, *, canvas_id: uuid.UUID, data: bytes, filename: str) -> CanvasObject:
-    """Seam for uploads AND Dropbox import (BE #2 calls this). Dedups to a
-    source entity, then places a PAPER/PDF object. Parsing/DOI extraction is a
-    follow-up; the dedup + placement contract is stable.
+def ingest_file(
+    db: Session,
+    *,
+    canvas_id: uuid.UUID,
+    data: bytes,
+    filename: str,
+    origin: str = "upload",
+    x: float = 0.0,
+    y: float = 0.0,
+) -> CanvasObject:
+    """The one ingestion path for uploads AND Dropbox imports.
+
+    Dedupes to a canonical source entity, then places a PDF object. Text
+    extraction and DOI matching against OpenAlex are a follow-up; this
+    dedupe-and-place contract is what callers depend on.
     """
     from canvas.dedup import resolve_or_create_source_entity
 
     entity = resolve_or_create_source_entity(
         db, source_type="UPLOADED_FILE", external_id=None, title=filename,
-        metadata={"filename": filename, "size_bytes": len(data)},
+        metadata={"filename": filename, "size_bytes": len(data), "origin": origin},
     )
     return create_object(
-        db, canvas_id=canvas_id, object_type="PAPER", title=filename,
-        content={"filename": filename}, source_entity_id=entity.id,
+        db, canvas_id=canvas_id, object_type="PDF", title=filename,
+        content={"filename": filename, "origin": origin, "sizeBytes": len(data)},
+        source_entity_id=entity.id, x=x, y=y,
     )
 
 
@@ -156,3 +168,33 @@ def canvas_openalex_ids(db: Session, canvas_id: uuid.UUID) -> set[str]:
         if oid:
             ids.add(oid)
     return ids
+
+
+def cache_openalex_work(db: Session, *, source_entity_id: uuid.UUID, work: dict) -> None:
+    """Persist a touched OpenAlex work (PRD §12: cache only what the user opens,
+    never mirror the corpus). Upsert so reopening a paper refreshes counts."""
+    from openalex import mapping
+    from models.entities import OpenAlexWorkCache
+
+    openalex_id = mapping.short_id(work.get("id"))
+    if not openalex_id:
+        return
+    row = db.get(OpenAlexWorkCache, source_entity_id)
+    if row is None:
+        row = OpenAlexWorkCache(source_entity_id=source_entity_id, openalex_id=openalex_id)
+        db.add(row)
+    row.openalex_id = openalex_id
+    row.doi = work.get("doi")
+    row.title = work.get("title") or work.get("display_name")
+    row.abstract_text = mapping.abstract_text(work.get("abstract_inverted_index"))
+    row.publication_date = str(work.get("publication_year") or "") or None
+    row.authors = {"list": mapping.authors(work)}
+    row.primary_topic = mapping.hierarchy(work)
+    row.topics = {"list": [t.get("display_name") for t in (work.get("topics") or [])]}
+    row.keywords = {"list": mapping.keywords(work)}
+    row.referenced_work_ids = {"list": work.get("referenced_works") or []}
+    row.related_work_ids = {"list": work.get("related_works") or []}
+    row.cited_by_count = work.get("cited_by_count") or 0
+    row.open_access = work.get("open_access") or {}
+    row.content_urls = {"pdf": mapping.pdf_url(work)}
+    db.commit()

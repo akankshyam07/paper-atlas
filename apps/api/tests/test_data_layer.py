@@ -58,8 +58,11 @@ def test_ingest_file_dedups_and_places():
     try:
         c = service.create_canvas(db, title="c")
         obj = service.ingest_file(db, canvas_id=c.id, data=b"%PDF", filename="paper.pdf")
-        assert obj.object_type == "PAPER"
+        # An ingested file is a PDF object; it only becomes a PAPER once its DOI
+        # or title matches an OpenAlex work (PRD §23).
+        assert obj.object_type == "PDF"
         assert obj.source_entity_id is not None
+        assert obj.content["sizeBytes"] == 4
     finally:
         db.close()
 

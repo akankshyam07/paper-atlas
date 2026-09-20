@@ -99,3 +99,29 @@ def to_paper_preview(work: dict[str, Any]) -> dict[str, Any]:
         "citedByCount": work.get("cited_by_count") or 0,
         "hasPdf": has_pdf(work),
     }
+
+
+def to_object_content(work: dict[str, Any]) -> dict[str, Any]:
+    """What a PAPER canvas object stores about its work.
+
+    The abstract matters beyond display: it is the text the viewer renders, so
+    it is what the user can select to make excerpts, notes and explanations.
+    """
+    hier = hierarchy(work)
+    return {
+        "openalexId": short_id(work.get("id")),
+        "doi": work.get("doi"),
+        "abstract": abstract_text(work.get("abstract_inverted_index")),
+        "year": work.get("publication_year"),
+        "venue": venue(work),
+        "authors": authors(work),
+        "citedByCount": work.get("cited_by_count") or 0,
+        "type": work.get("type"),
+        "topics": [t.get("display_name") for t in (work.get("topics") or []) if t.get("display_name")],
+        "keywords": keywords(work),
+        "field": hier.get("field"),
+        "subfield": hier.get("subfield"),
+        "pdfUrl": pdf_url(work),
+        "hasPdf": has_pdf(work),
+        "referencedCount": len(work.get("referenced_works") or []),
+    }

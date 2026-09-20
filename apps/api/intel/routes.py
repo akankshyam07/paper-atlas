@@ -55,6 +55,27 @@ def search(q: str, mode: str = "keyword", limit: int = 10) -> SearchResponse:
     return SearchResponse(results=[PaperPreview(**mapping.to_paper_preview(w)) for w in works])
 
 
+@router.get("/citations", response_model=SearchResponse)
+def citations(objectId: str, direction: str = "out", limit: int = 25, db: Session = Depends(get_db)) -> SearchResponse:
+    """Papers this work cites (direction=out, from referenced_works) or papers
+    citing it (direction=in, via the cites: filter). Backs the References,
+    Cited by and Related actions (PRD §25).
+    """
+    openalex_id, _ = _resolve_openalex_id(db, objectId)
+    if not openalex_id:
+        return SearchResponse(results=[])
+
+    provider = get_research_data()
+    if direction == "related":
+        work = provider.get_work(openalex_id)
+        related = (work.get("related_works") or [])[:limit]
+        works = provider.get_works_by_ids(related) if related else []
+    else:
+        works = provider.get_citations(openalex_id, direction=direction)[:limit]
+
+    return SearchResponse(results=[PaperPreview(**mapping.to_paper_preview(w)) for w in works])
+
+
 @router.post("/recommend", response_model=RecommendResponse)
 def recommend(req: RecommendRequest, db: Session = Depends(get_db)) -> RecommendResponse:
     openalex_id, canvas_id = _resolve_openalex_id(db, req.objectId)
