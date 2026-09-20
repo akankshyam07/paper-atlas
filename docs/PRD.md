@@ -1592,9 +1592,9 @@ Long Lake, Ramp. (Not pursuing Devin.)
 - **Long Lake**: AI materially better than a chatbot — understands the graph,
   turns explanations into persistent objects, proposes the next direction
   visually, connects claims to papers/excerpts, reorganizes via approved actions.
-- **Voloridge** ("Signal in the Noise"): the recommendation/ranking layer pulls
-  high-signal papers from OpenAlex's large, noisy corpus. Optional: run heavy
-  embedding/ranking on Voloridge compute. Not a data provider.
+- **Voloridge** ("Signal in the Noise"): the dataset is OpenAlex itself; the
+  recommendation/ranking layer extracts high-signal papers from that large, noisy
+  corpus. Rides on the existing OpenAlex ResearchDataProvider — no new interface.
 - **Ramp** ("Save Time. Save Money."): the whole product saves research time.
 
 ### Constraint (extends §33)

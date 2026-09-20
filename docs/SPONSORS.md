@@ -32,7 +32,7 @@ Two kinds of fit:
 | Sponsor | Challenge | How Paper Atlas answers it |
 |---|---|---|
 | **Long Lake** | "Convince a non-believer" — AI materially better than a chatbot | AI understands the research graph, turns explanations into persistent objects, proposes the next direction visually, connects claims to papers/excerpts, reorganizes via user-approved actions |
-| **Voloridge** | "Signal in the Noise" — extract signal from huge, messy datasets | Broader/Deeper + foundational/recent ranking pulls high-signal papers out of OpenAlex's massive, noisy corpus; deterministic feature scoring + LLM rerank + loop suppression. Optional: run heavy embedding/ranking on Voloridge compute |
+| **Voloridge** | "Signal in the Noise" — extract signal from huge, messy datasets | The dataset is OpenAlex itself (~250M works). Broader/Deeper + foundational/recent ranking pulls high-signal papers out of that noisy corpus: deterministic feature scoring + LLM rerank + loop suppression |
 | **Ramp** | "Save Time. Save Money." | The whole product saves research time — no lost tabs, faster discovery, AI summaries with provenance instead of re-reading papers |
 
 ## Notes
@@ -62,10 +62,11 @@ cheaper-model routing, prompt compression (their models at thetokencompany.com).
 Measuring tokens saved is the challenge deliverable. Impl in
 `providers/token_company.py`. $500 prize.
 
-### Voloridge — signal in the noise (+ optional compute)
-Answered by the recommendation/ranking layer, not a code interface. Voloridge
-also offers AWS CPU/GPU compute at their booth; use it only if we run heavy local
-embedding/ranking. Not required for the MVP.
+### Voloridge — signal in the noise (dataset = OpenAlex)
+The dataset is OpenAlex itself: a huge, noisy scholarly corpus. Our
+recommendation/ranking layer IS the signal extraction — surfacing foundational,
+deeper, and high-impact papers and suppressing near-duplicates and loops. No new
+interface; it rides on the existing OpenAlex `ResearchDataProvider`.
 
 ### Ramp / Long Lake — product framing
 No integration; the product already embodies both. Emphasize in the demo.
