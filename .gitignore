@@ -37,3 +37,4 @@ test-results/
 apps/web/next-env.d.ts
 apps/web/tsconfig.tsbuildinfo
 .storage/
+apps/web/.next-check/
